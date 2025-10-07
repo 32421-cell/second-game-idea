@@ -3,14 +3,17 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Echoes of the Forgotten - Random Maps</title>
+<title>Echoes of the Forgotten - Game</title>
 <style>
   body { margin:0; font-family: sans-serif; background: #111; color: #fff; overflow: hidden; }
-  #gameCanvas { background: #222; display: block; margin: 0 auto; }
-  #cutscene { position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
-              background: rgba(0,0,0,0.85); color: #fff; display: flex; 
-              justify-content: center; align-items: center; text-align: center;
-              font-size: 24px; padding: 20px; display: none; cursor: pointer; }
+  #gameCanvas { display: block; margin: 0 auto; background: #222; }
+  #cutscene { position: absolute; top:0; left:0; width:100%; height:100%; 
+              background: rgba(0,0,0,0.85); color:#fff; display:flex; 
+              justify-content:center; align-items:center; text-align:center;
+              font-size:24px; padding:20px; display:none; cursor:pointer; }
+  #hud { position:absolute; top:0; left:0; width:100%; height:40px; background:#333; display:flex; 
+         align-items:center; justify-content:space-around; color:#fff; font-weight:bold; }
+  button { padding:5px 10px; background:#555; border:none; color:white; cursor:pointer; }
 </style>
 </head>
 <body>
@@ -18,6 +21,13 @@
 <audio id="bgMusic" loop>
   <source src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" type="audio/mpeg">
 </audio>
+
+<div id="hud">
+  <span id="healthBar">Health: 3</span>
+  <button id="pauseBtn">Pause</button>
+  <button id="restartBtn">Restart</button>
+  <button id="musicBtn">Music: On</button>
+</div>
 
 <canvas id="gameCanvas" width="800" height="500"></canvas>
 <div id="cutscene"></div>
@@ -27,142 +37,192 @@ const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 const cutsceneDiv = document.getElementById('cutscene');
 const bgMusic = document.getElementById('bgMusic');
+const healthBar = document.getElementById('healthBar');
+const pauseBtn = document.getElementById('pauseBtn');
+const restartBtn = document.getElementById('restartBtn');
+const musicBtn = document.getElementById('musicBtn');
 
-let player = { x: 50, y: 400, width: 40, height: 40, color: 'cyan', health: 3, speed: 5 };
-let keys = {};
+let paused = false;
+let musicOn = true;
 let inCutscene = true;
-let currentLevel = 0;
 
-// Generate random maps
-function generateLevel(){
-  const enemyCount = Math.floor(Math.random() * 3) + 1;
-  const enemies = [];
-  for(let i=0;i<enemyCount;i++){
-    enemies.push({
-      x: Math.random() * 700 + 50,
-      y: Math.random() * 400 + 50,
-      width: 40,
-      height: 40,
-      color: 'red',
-      dir: Math.random() < 0.5 ? 1 : -1,
-      speed: Math.random() * 2 + 1
-    });
-  }
-  return {
-    bgColor: `rgb(${Math.random()*50+50},${Math.random()*50+50},${Math.random()*50+50})`,
-    cutscenes: [
-      `Level ${currentLevel+1}: You enter the mysterious ruins...`,
-      "Shadows move as if alive around you..."
-    ],
-    enemies: enemies,
-    puzzle: {
-      x: Math.random()*700+50,
-      y: Math.random()*300+50,
-      width:50,
-      height:50,
-      solved:false,
-      cutscene:"You solved the ancient puzzle! A secret passage opens..."
-    }
-  };
-}
+// Game state
+let player = { x:50, y:400, width:40, height:40, color:'cyan', speed:5, health:3 };
+let keys = {};
 
-// Start with random level
-let level = generateLevel();
+// HUD events
+pauseBtn.addEventListener('click', ()=> paused = !paused);
+restartBtn.addEventListener('click', ()=> restartLevel());
+musicBtn.addEventListener('click', ()=>{
+  musicOn = !musicOn;
+  musicOn ? bgMusic.play() : bgMusic.pause();
+  musicBtn.innerText = "Music: "+(musicOn?"On":"Off");
+});
 
 // Keyboard handling
-document.addEventListener('keydown', e => keys[e.key] = true);
-document.addEventListener('keyup', e => keys[e.key] = false);
+document.addEventListener('keydown', e => keys[e.key.toLowerCase()] = true);
+document.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
+
+// Game map (simple platform/tile map)
+const maps = [
+  {
+    bgColor:'#222',
+    platforms: [
+      {x:0, y:450, width:800, height:50}, // ground
+      {x:200, y:350, width:100, height:20},
+      {x:400, y:300, width:100, height:20},
+      {x:600, y:250, width:150, height:20},
+    ],
+    enemies: [
+      {x:300, y:400, width:40, height:40, color:'red', dir:1, speed:2}
+    ],
+    puzzle: {x:650, y:200, width:40, height:40, solved:false},
+    cutscenes:[
+      "You are Kael, a young archaeologist uncovering a lost city.",
+      "Ancient guardians and puzzles await you in the shadows.",
+      "Reach the puzzle and press 'E' to interact!"
+    ]
+  },
+  {
+    bgColor:'#333',
+    platforms: [
+      {x:0, y:450, width:800, height:50}, 
+      {x:150, y:380, width:100, height:20},
+      {x:350, y:320, width:120, height:20},
+      {x:550, y:260, width:100, height:20},
+    ],
+    enemies: [
+      {x:200, y:400, width:40, height:40, color:'red', dir:1, speed:2.5},
+      {x:500, y:350, width:40, height:40, color:'red', dir:-1, speed:1.8}
+    ],
+    puzzle: {x:570, y:220, width:40, height:40, solved:false},
+    cutscenes:[
+      "Level 2: Shadows deepen, and whispers grow louder...",
+      "Solve puzzles and survive the guardians to uncover the truth."
+    ]
+  }
+];
+
+let currentLevel = 0;
+let level = maps[currentLevel];
 
 // Cutscene handling
 let currentCutscene = 0;
 function showCutscene(text){
-  cutsceneDiv.style.display = 'flex';
-  cutsceneDiv.innerText = text;
+  cutsceneDiv.style.display='flex';
+  cutsceneDiv.innerText=text;
 }
-cutsceneDiv.addEventListener('click', () => {
+cutsceneDiv.addEventListener('click', ()=>{
   currentCutscene++;
-  if(currentCutscene < level.cutscenes.length){
+  if(currentCutscene<level.cutscenes.length){
     showCutscene(level.cutscenes[currentCutscene]);
-  } else {
-    cutsceneDiv.style.display = 'none';
-    inCutscene = false;
-    currentCutscene = 0;
-    bgMusic.play();
+  }else{
+    cutsceneDiv.style.display='none';
+    inCutscene=false;
+    currentCutscene=0;
+    if(musicOn) bgMusic.play();
   }
 });
 
 // Collision detection
 function rectCollision(a,b){
-  return a.x < b.x + b.width && a.x + a.width > b.x &&
-         a.y < b.y + b.height && a.y + a.height > b.y;
+  return a.x < b.x+b.width && a.x+a.width > b.x &&
+         a.y < b.y+b.height && a.y+a.height > b.y;
+}
+
+// Platform collision (simple)
+function applyGravity(player){
+  player.y += 5; // gravity
+  let onGround=false;
+  for(let plat of level.platforms){
+    if(rectCollision(player, plat) && player.y+player.height<=plat.y+10){
+      player.y = plat.y - player.height;
+      onGround=true;
+    }
+  }
+  return onGround;
+}
+
+// Restart level
+function restartLevel(){
+  player.x=50; player.y=400; player.health=3;
+  level.puzzle.solved=false;
+  inCutscene=true;
+  currentCutscene=0;
+  showCutscene(level.cutscenes[0]);
 }
 
 // Game loop
 function gameLoop(){
-  ctx.fillStyle = level.bgColor;
-  ctx.fillRect(0,0,canvas.width,canvas.height);
+  if(!paused){
+    ctx.fillStyle=level.bgColor;
+    ctx.fillRect(0,0,canvas.width,canvas.height);
 
-  if(!inCutscene){
-    // Player movement
-    if(keys['ArrowLeft']) player.x -= player.speed;
-    if(keys['ArrowRight']) player.x += player.speed;
-    if(keys['ArrowUp']) player.y -= player.speed;
-    if(keys['ArrowDown']) player.y += player.speed;
+    if(!inCutscene){
+      // Movement
+      let onGround = applyGravity(player);
+      if(keys['arrowleft']) player.x -= player.speed;
+      if(keys['arrowright']) player.x += player.speed;
+      if(keys['arrowup'] && onGround) player.y -= 15; // jump
 
-    player.x = Math.max(0, Math.min(canvas.width-player.width, player.x));
-    player.y = Math.max(0, Math.min(canvas.height-player.height, player.y));
+      // Draw platforms
+      for(let plat of level.platforms){
+        ctx.fillStyle='grey';
+        ctx.fillRect(plat.x,plat.y,plat.width,plat.height);
+      }
 
-    // Draw player
-    ctx.fillStyle = player.color;
-    ctx.fillRect(player.x, player.y, player.width, player.height);
+      // Draw player
+      ctx.fillStyle=player.color;
+      ctx.fillRect(player.x,player.y,player.width,player.height);
 
-    // Move & draw enemies
-    level.enemies.forEach(enemy => {
-      enemy.x += enemy.dir * enemy.speed;
-      if(enemy.x <=0 || enemy.x+enemy.width>=canvas.width) enemy.dir*=-1;
-      ctx.fillStyle = enemy.color;
-      ctx.fillRect(enemy.x, enemy.y, enemy.width, enemy.height);
-
-      if(rectCollision(player,enemy)){
-        player.health--;
-        player.x = 50; player.y = 400;
-        if(player.health<=0){
-          inCutscene = true;
-          showCutscene("You were defeated! Restarting level...");
-          player.health=3;
+      // Enemies
+      for(let enemy of level.enemies){
+        enemy.x += enemy.dir*enemy.speed;
+        if(enemy.x<=0||enemy.x+enemy.width>=canvas.width) enemy.dir*=-1;
+        ctx.fillStyle=enemy.color;
+        ctx.fillRect(enemy.x,enemy.y,enemy.width,enemy.height);
+        if(rectCollision(player,enemy)){
+          player.health--;
+          healthBar.innerText='Health: '+player.health;
+          player.x=50; player.y=400;
+          if(player.health<=0) restartLevel();
         }
       }
-    });
 
-    // Puzzle (requires "E" to interact)
-    ctx.fillStyle = level.puzzle.solved ? 'green' : 'yellow';
-    ctx.fillRect(level.puzzle.x, level.puzzle.y, level.puzzle.width, level.puzzle.height);
-    if(rectCollision(player, level.puzzle) && keys['e']){
-      if(!level.puzzle.solved){
-        level.puzzle.solved = true;
-        inCutscene = true;
-        showCutscene(level.puzzle.cutscene);
+      // Puzzle
+      ctx.fillStyle=level.puzzle.solved ? 'green' : 'yellow';
+      ctx.fillRect(level.puzzle.x,level.puzzle.y,level.puzzle.width,level.puzzle.height);
+      if(rectCollision(player,level.puzzle) && keys['e']){
+        if(!level.puzzle.solved){
+          level.puzzle.solved=true;
+          inCutscene=true;
+          showCutscene("Puzzle solved! A path forward opens...");
+        }
       }
-    }
 
-    // Level completion (top-right corner after puzzle)
-    if(level.puzzle.solved && player.x > canvas.width-60 && player.y < 60){
-      currentLevel++;
-      level = generateLevel();
-      inCutscene = true;
-      showCutscene(level.cutscenes[0]);
-      player.x = 50; player.y = 400;
+      // Level completion
+      if(level.puzzle.solved && player.x>canvas.width-60 && player.y<60){
+        currentLevel++;
+        if(currentLevel>=maps.length){
+          inCutscene=true;
+          showCutscene("Congratulations! You uncovered all the city secrets!");
+        }else{
+          level=maps[currentLevel];
+          restartLevel();
+        }
+      }
+
+      healthBar.innerText='Health: '+player.health;
     }
   }
 
   requestAnimationFrame(gameLoop);
 }
 
-// Start game
+// Start first cutscene
 showCutscene(level.cutscenes[0]);
 gameLoop();
 
 </script>
 </body>
 </html>
-
