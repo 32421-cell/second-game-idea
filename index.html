@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Echoes of the Forgotten - Mini Game</title>
+<title>Echoes of the Forgotten - Moving Version</title>
 <style>
   body { margin:0; font-family: sans-serif; background: #111; color: #fff; }
   #gameCanvas { background: #222; display: block; margin: 0 auto; }
@@ -23,36 +23,24 @@ const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 const cutsceneDiv = document.getElementById('cutscene');
 
-let player = { x: 50, y: 400, width: 40, height: 40, color: 'cyan', health: 3 };
+let player = { x: 50, y: 400, width: 40, height: 40, color: 'cyan', health: 3, speed: 5 };
 let keys = {};
-let currentLevel = 0;
 let inCutscene = true;
 
-// Define levels with enemies, puzzle triggers, and cutscenes
-const levels = [
-  {
-    bgColor: '#222',
-    cutscenes: [
-      "You awaken in a mysterious, frozen city...",
-      "Echoes of the past whisper around you...",
-      "Your journey to uncover the dark secret begins now!"
-    ],
-    enemies: [{x: 500, y: 400, width: 40, height:40, color:'red'}],
-    puzzle: {x: 700, y: 50, width:50, height:50, solved: false, cutscene: "You found an ancient mechanism! Solve it to proceed..."}
-  },
-  {
-    bgColor: '#333',
-    cutscenes: [
-      "Level 2: You enter the Hall of Shadows...",
-      "The ghosts of the city grow restless..."
-    ],
-    enemies: [
-      {x: 300, y: 400, width: 40, height:40, color:'red'},
-      {x: 600, y: 300, width: 40, height:40, color:'red'}
-    ],
-    puzzle: {x: 750, y: 100, width:50, height:50, solved: false, cutscene: "A locked door with strange symbols... Solve the puzzle to unlock it."}
-  }
-];
+// Level setup
+const level = {
+  bgColor: '#222',
+  cutscenes: [
+    "You awaken in a mysterious, frozen city...",
+    "Echoes of the past whisper around you...",
+    "Your journey begins now!"
+  ],
+  enemies: [
+    {x: 500, y: 400, width: 40, height:40, color:'red', dir:1, speed:2},
+    {x: 600, y: 300, width: 40, height:40, color:'red', dir:1, speed:1.5}
+  ],
+  puzzle: {x: 700, y: 50, width:50, height:50, solved: false, cutscene: "You found an ancient mechanism! Solve it to proceed..."}
+};
 
 // Keyboard handling
 document.addEventListener('keydown', e => keys[e.key] = true);
@@ -64,16 +52,13 @@ function showCutscene(text){
   cutsceneDiv.style.display = 'flex';
   cutsceneDiv.innerText = text;
 }
-
 cutsceneDiv.addEventListener('click', () => {
-  let level = levels[currentLevel];
   currentCutscene++;
   if(currentCutscene < level.cutscenes.length){
     showCutscene(level.cutscenes[currentCutscene]);
   } else {
     cutsceneDiv.style.display = 'none';
     inCutscene = false;
-    currentCutscene = 0;
   }
 });
 
@@ -85,16 +70,15 @@ function rectCollision(a,b){
 
 // Game loop
 function gameLoop(){
-  let level = levels[currentLevel];
   ctx.fillStyle = level.bgColor;
   ctx.fillRect(0,0,canvas.width,canvas.height);
 
   if(!inCutscene){
     // Player movement
-    if(keys['ArrowLeft']) player.x -= 4;
-    if(keys['ArrowRight']) player.x += 4;
-    if(keys['ArrowUp']) player.y -= 4;
-    if(keys['ArrowDown']) player.y += 4;
+    if(keys['ArrowLeft']) player.x -= player.speed;
+    if(keys['ArrowRight']) player.x += player.speed;
+    if(keys['ArrowUp']) player.y -= player.speed;
+    if(keys['ArrowDown']) player.y += player.speed;
 
     // Keep player in bounds
     player.x = Math.max(0, Math.min(canvas.width-player.width, player.x));
@@ -104,23 +88,26 @@ function gameLoop(){
     ctx.fillStyle = player.color;
     ctx.fillRect(player.x, player.y, player.width, player.height);
 
-    // Draw enemies
+    // Draw and move enemies
     level.enemies.forEach(enemy => {
+      enemy.x += enemy.dir * enemy.speed;
+      if(enemy.x <= 0 || enemy.x + enemy.width >= canvas.width) enemy.dir *= -1; // reverse
       ctx.fillStyle = enemy.color;
       ctx.fillRect(enemy.x, enemy.y, enemy.width, enemy.height);
 
-      if(rectCollision(player,enemy)){
+      // Collision
+      if(rectCollision(player, enemy)){
         player.health--;
-        player.x = 50; player.y = 400; // reset position
+        player.x = 50; player.y = 400; // reset
         if(player.health <= 0){
           inCutscene = true;
-          showCutscene("You have been defeated... Restarting level.");
+          showCutscene("You were hit! Restarting level...");
           player.health = 3;
         }
       }
     });
 
-    // Draw puzzle
+    // Puzzle
     if(!level.puzzle.solved){
       ctx.fillStyle = 'yellow';
       ctx.fillRect(level.puzzle.x, level.puzzle.y, level.puzzle.width, level.puzzle.height);
@@ -133,16 +120,8 @@ function gameLoop(){
 
     // Level completion
     if(level.puzzle.solved && player.x > canvas.width-60 && player.y < 60){
-      currentLevel++;
-      if(currentLevel >= levels.length){
-        inCutscene = true;
-        showCutscene("Congratulations! You uncovered the secrets of the city!");
-        return;
-      } else {
-        inCutscene = true;
-        showCutscene(levels[currentLevel].cutscenes[0]);
-        player.x = 50; player.y = 400;
-      }
+      inCutscene = true;
+      showCutscene("Level complete! Congratulations!");
     }
   }
 
@@ -150,7 +129,7 @@ function gameLoop(){
 }
 
 // Start game
-showCutscene(levels[currentLevel].cutscenes[0]);
+showCutscene(level.cutscenes[0]);
 gameLoop();
 
 </script>
