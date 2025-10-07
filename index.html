@@ -3,17 +3,17 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Echoes of the Forgotten - Upgraded</title>
+<title>Echoes of the Forgotten - Fixed</title>
 <style>
   body { margin:0; font-family:sans-serif; background:#111; overflow:hidden; }
   #gameCanvas { display:block; margin:0 auto; background:#000; }
   #cutscene { position:absolute; top:0; left:0; width:100%; height:100%; 
               background: rgba(0,0,0,0.85); color:#fff; display:flex; 
               justify-content:center; align-items:center; text-align:center;
-              font-size:24px; padding:20px; display:none; cursor:pointer; z-index:5; }
+              font-size:24px; padding:20px; cursor:pointer; }
   #hud { position:absolute; top:0; left:0; width:100%; height:50px; 
          background: linear-gradient(90deg,#444,#111); display:flex; 
-         align-items:center; justify-content:space-around; color:#fff; font-weight:bold; font-size:18px; z-index:4; }
+         align-items:center; justify-content:space-around; color:#fff; font-weight:bold; font-size:18px; }
   button { padding:6px 12px; background:#555; border:none; border-radius:6px; color:white; cursor:pointer; transition:0.2s; }
   button:hover { background:#777; }
 </style>
@@ -45,6 +45,7 @@ const restartBtn = document.getElementById('restartBtn');
 const musicBtn = document.getElementById('musicBtn');
 
 let paused=false, musicOn=true, inCutscene=true;
+let images = {};
 
 // HUD buttons
 pauseBtn.addEventListener('click', ()=> paused=!paused);
@@ -58,56 +59,38 @@ musicBtn.addEventListener('click', ()=>{
 // Player
 let player = { x:50, y:400, width:40, height:50, color:'cyan', speed:5, vy:0, onGround:false, lives:3 };
 let keys = {};
-
-// Keyboard
 document.addEventListener('keydown', e=>keys[e.key.toLowerCase()]=true);
 document.addEventListener('keyup', e=>keys[e.key.toLowerCase()]=false);
 
-// Levels with increasing difficulty
+// Levels
 const maps = [
   {
     bg:'https://i.ibb.co/1JpY9H3/bg1.jpg',
-    platforms: [
-      {x:0,y:450,width:900,height:50},
-      {x:200,y:350,width:120,height:20},
-      {x:450,y:300,width:120,height:20},
-      {x:700,y:250,width:120,height:20}
-    ],
-    enemies:[ {x:300,y:400,width:40,height:40,color:'red',type:'fast',dir:1,speed:2} ],
+    platforms:[ {x:0,y:450,width:900,height:50},{x:200,y:350,width:120,height:20},{x:450,y:300,width:120,height:20},{x:700,y:250,width:120,height:20}],
+    enemies:[ {x:300,y:400,width:40,height:40,color:'red',dir:1,speed:2} ],
     puzzle:{x:750,y:200,width:40,height:40,solved:false},
-    collectibles:[{x:400,y:270,width:20,height:20,collected:false}],
-    cutscenes:[
-      "Kael enters the ruins, shadows stir...",
-      "Avoid the guardians and solve the ancient puzzle!"
-    ]
-  },
-  {
-    bg:'https://i.ibb.co/2n6dkK5/bg2.jpg',
-    platforms:[
-      {x:0,y:450,width:900,height:50},
-      {x:150,y:380,width:100,height:20,move:true,dir:1,speed:1},
-      {x:350,y:320,width:150,height:20,move:true,dir:-1,speed:1.5},
-      {x:600,y:260,width:150,height:20},
-      {x:750,y:200,width:100,height:20}
-    ],
-    enemies:[
-      {x:200,y:400,width:40,height:40,color:'red',type:'fast',dir:1,speed:2.5},
-      {x:500,y:350,width:40,height:60,color:'darkred',type:'tall',dir:-1,speed:1.2},
-      {x:650,y:220,width:40,height:40,color:'purple',type:'ranged',dir:0,speed:0,shootCooldown:0}
-    ],
-    puzzle:{x:770,y:160,width:40,height:40,solved:false},
-    collectibles:[{x:550,y:220,width:20,height:20,collected:false}],
-    cutscenes:[
-      "Level 2: The shadows grow restless...",
-      "Move quickly and solve the puzzle before they reach you!"
-    ]
+    cutscenes:["Kael enters the ruins, shadows stir...","Avoid the guardians and solve the ancient puzzle!"]
   }
 ];
 
-let currentLevel=0, level=maps[currentLevel];
+let currentLevel=0, level=maps[currentLevel], currentCutscene=0;
+let particles=[], bullets=[];
 
-// Cutscene
-let currentCutscene=0;
+// Preload images
+function preloadImages(urls, callback){
+  let loaded=0;
+  urls.forEach(url=>{
+    let img = new Image();
+    img.src = url;
+    img.onload = ()=>{
+      loaded++;
+      if(loaded === urls.length) callback();
+    };
+    images[url] = img;
+  });
+}
+
+// Cutscene display
 function showCutscene(text){
   cutsceneDiv.style.display='flex';
   cutsceneDiv.innerText=text;
@@ -115,16 +98,13 @@ function showCutscene(text){
 cutsceneDiv.addEventListener('click', ()=>{
   currentCutscene++;
   if(currentCutscene<level.cutscenes.length) showCutscene(level.cutscenes[currentCutscene]);
-  else { cutsceneDiv.style.display='none'; inCutscene=false; currentCutscene=0; if(musicOn) bgMusic.play();}
+  else { cutsceneDiv.style.display='none'; inCutscene=false; if(musicOn) bgMusic.play(); }
 });
 
 // Collision
-function rectCollision(a,b){
-  return a.x < b.x+b.width && a.x+a.width > b.x &&
-         a.y < b.y+b.height && a.y+a.height > b.y;
-}
+function rectCollision(a,b){ return a.x < b.x+b.width && a.x+a.width > b.x && a.y < b.y+b.height && a.y+a.height > b.y; }
 
-// Gravity & platforms
+// Gravity
 function applyGravity(player){
   player.vy += 0.8;
   player.y += player.vy;
@@ -138,61 +118,43 @@ function applyGravity(player){
   }
 }
 
-// Restart level
+// Restart
 function restartLevel(){
   player.x=50; player.y=400; player.vy=0; player.lives=3;
   level.puzzle.solved=false;
-  level.collectibles.forEach(c=>c.collected=false);
+  particles=[];
+  bullets=[];
   inCutscene=true;
   currentCutscene=0;
   healthBar.innerText='Lives: '+player.lives;
   showCutscene(level.cutscenes[0]);
 }
 
-// Particle effect
-let particles=[];
+// Particles
 function spawnParticles(x,y){
-  for(let i=0;i<15;i++){
-    particles.push({x:x, y:y, vx:(Math.random()-0.5)*4, vy:(Math.random()-1.5)*3, life:30});
-  }
+  for(let i=0;i<15;i++){ particles.push({x:x, y:y, vx:(Math.random()-0.5)*4, vy:(Math.random()-1.5)*3, life:30}); }
 }
 function updateParticles(){
-  particles.forEach(p=>{
-    p.x+=p.vx; p.y+=p.vy; p.vy+=0.1; p.life--;
-    ctx.fillStyle='yellow';
-    ctx.fillRect(p.x,p.y,2,2);
-  });
-  particles=particles.filter(p=>p.life>0);
+  particles.forEach(p=>{ p.x+=p.vx; p.y+=p.vy; p.vy+=0.1; p.life--; ctx.fillStyle='yellow'; ctx.fillRect(p.x,p.y,2,2); });
+  particles = particles.filter(p=>p.life>0);
 }
 
-// Game loop
+// Game Loop
 function gameLoop(){
   if(!paused){
-    // Draw background
-    let bgImg = new Image();
-    bgImg.src=level.bg;
-    ctx.drawImage(bgImg,0,0,canvas.width,canvas.height);
+    // Background
+    ctx.drawImage(images[level.bg],0,0,canvas.width,canvas.height);
 
     if(!inCutscene){
-      // Gravity
+      // Gravity & movement
       applyGravity(player);
-
-      // Movement
       if(keys['arrowleft']) player.x -= player.speed;
       if(keys['arrowright']) player.x += player.speed;
       if(keys['arrowup'] && player.onGround) player.vy=-15;
 
-      // Moving platforms
-      level.platforms.forEach(plat=>{
-        if(plat.move){
-          plat.x += plat.dir*plat.speed;
-          if(plat.x<=0 || plat.x+plat.width>=canvas.width) plat.dir*=-1;
-        }
-      });
-
       // Platforms
       ctx.fillStyle='rgba(100,100,100,0.8)';
-      for(let plat of level.platforms) ctx.fillRect(plat.x,plat.y,plat.width,plat.height);
+      level.platforms.forEach(plat=>ctx.fillRect(plat.x,plat.y,plat.width,plat.height));
 
       // Player
       ctx.fillStyle=player.color;
@@ -200,29 +162,15 @@ function gameLoop(){
 
       // Enemies
       level.enemies.forEach(enemy=>{
-        if(enemy.type==='fast' || enemy.type==='tall'){
-          enemy.x += enemy.dir*enemy.speed;
-          if(enemy.x<=0||enemy.x+enemy.width>=canvas.width) enemy.dir*=-1;
-        }
-        // Ranged shooting
-        if(enemy.type==='ranged'){
-          enemy.shootCooldown--;
-          if(enemy.shootCooldown<=0){
-            enemy.shootCooldown=120; // cooldown
-            bullets.push({x:enemy.x, y:enemy.y, vx:-4});
-          }
-        }
+        enemy.x += enemy.dir*enemy.speed;
+        if(enemy.x<=0||enemy.x+enemy.width>=canvas.width) enemy.dir*=-1;
         ctx.fillStyle=enemy.color;
         ctx.fillRect(enemy.x,enemy.y,enemy.width,enemy.height);
         if(rectCollision(player,enemy)){
           player.lives--;
           healthBar.innerText='Lives: '+player.lives;
           player.x=50; player.y=400; player.vy=0;
-          if(player.lives<=0){
-            inCutscene=true;
-            showCutscene("You have perished! Try again...");
-            restartLevel();
-          }
+          if(player.lives<=0){ inCutscene=true; showCutscene("You have perished! Try again..."); restartLevel(); }
         }
       });
 
@@ -233,30 +181,10 @@ function gameLoop(){
         level.puzzle.solved=true;
         inCutscene=true;
         spawnParticles(level.puzzle.x+20, level.puzzle.y+20);
-        showCutscene("Puzzle solved! A path forward opens...");
+        showCutscene("Puzzle solved! Path forward opens...");
       }
 
-      // Collectibles
-      level.collectibles.forEach(c=>{
-        if(!c.collected){
-          ctx.fillStyle='gold';
-          ctx.fillRect(c.x,c.y,c.width,c.height);
-          if(rectCollision(player,c)){
-            c.collected=true;
-            spawnParticles(c.x+10,c.y+10);
-            showCutscene("You found a secret artifact!");
-          }
-        }
-      });
-
-      // Level completion
-      if(level.puzzle.solved && player.x>canvas.width-60 && player.y<60){
-        currentLevel++;
-        if(currentLevel>=maps.length) showCutscene("Congratulations! You uncovered all secrets!");
-        else { level=maps[currentLevel]; restartLevel(); }
-      }
-
-      healthBar.innerText='Lives: '+player.lives;
+      // Particles
       updateParticles();
     }
   }
@@ -264,37 +192,11 @@ function gameLoop(){
   requestAnimationFrame(gameLoop);
 }
 
-// Bullets for ranged enemies
-let bullets=[];
-function updateBullets(){
-  bullets.forEach(b=>{
-    b.x += b.vx;
-    ctx.fillStyle='purple';
-    ctx.fillRect(b.x,b.y,10,5);
-    if(rectCollision(player,b)){
-      player.lives--;
-      healthBar.innerText='Lives: '+player.lives;
-      player.x=50; player.y=400; player.vy=0;
-      bullets=bullets.filter(b2=>b2!==b);
-      if(player.lives<=0){ inCutscene=true; showCutscene("You have perished! Try again..."); restartLevel();}
-    }
-  });
-  bullets=bullets.filter(b=>b.x>0 && b.x<canvas.width);
-}
-
-// Start game
-showCutscene(level.cutscenes[0]);
-
-function loop(){
+// Start
+preloadImages([level.bg], ()=>{
+  showCutscene(level.cutscenes[0]);
   gameLoop();
-  updateBullets();
-  requestAnimationFrame(loop);
-}
-loop();
-</script>
-</body>
-</html>
-
+});
 </script>
 </body>
 </html>
