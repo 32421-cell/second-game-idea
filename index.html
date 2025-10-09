@@ -1,235 +1,384 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Echoes of the Forgotten - Full Upgrade</title>
-<style>
-  body { margin:0; font-family:sans-serif; background:#111; overflow:hidden; }
-  #gameCanvas { display:block; margin:0 auto; background:#000; }
-  #cutscene { position:absolute; top:0; left:0; width:100%; height:100%; 
-              background: rgba(0,0,0,0.85); color:#fff; display:flex; 
-              justify-content:center; align-items:center; text-align:center;
-              font-size:24px; padding:20px; cursor:pointer; z-index:5; }
-  #hud { position:absolute; top:0; left:0; width:100%; height:50px; 
-         background: linear-gradient(90deg,#444,#111); display:flex; 
-         align-items:center; justify-content:space-around; color:#fff; font-weight:bold; font-size:18px; z-index:4; }
-  button { padding:6px 12px; background:#555; border:none; border-radius:6px; color:white; cursor:pointer; transition:0.2s; }
-  button:hover { background:#777; }
-</style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Echoes of Yourself — Prototype</title>
+  <style>
+    :root{--bg:#0b0f1a;--panel:#0f1724;--accent:#8be9fd;--muted:#98a0b3}
+    html,body{height:100%;margin:0;font-family:Inter,Segoe UI,system-ui,Arial}
+    body{background:linear-gradient(180deg,#061025 0%, #0b1220 100%);color:#dfe8f2;display:flex;align-items:center;justify-content:center}
+    #app{width:1100px;max-width:98vw;background:linear-gradient(180deg, rgba(255,255,255,0.02), transparent);border-radius:14px;padding:18px;box-shadow:0 10px 40px rgba(2,6,23,0.7)}
+    .row{display:flex;gap:16px}
+    /* Canvas area */
+    .viewport{background:radial-gradient(circle at 20% 10%, rgba(139,233,253,0.05), transparent), #071124;border-radius:8px;padding:12px;flex:1;min-height:620px}
+    canvas{display:block;background:transparent;border-radius:8px;width:100%;height:600px}
+    /* Sidebar */
+    .sidebar{width:320px;background:linear-gradient(180deg, rgba(255,255,255,0.01), transparent);padding:12px;border-radius:8px}
+    h1{font-size:20px;margin:6px 0}
+    .menu{display:flex;flex-direction:column;gap:10px}
+    button{background:var(--panel);color:var(--accent);border:1px solid rgba(139,233,253,0.12);padding:10px;border-radius:8px;cursor:pointer}
+    .btn-flat{background:transparent;border:1px solid rgba(255,255,255,0.04);color:var(--muted)}
+    label{font-size:12px;color:var(--muted)}
+    input[type=color]{height:36px;width:100%;border-radius:6px;border:0;padding:0}
+    .preview{width:100%;height:120px;background:linear-gradient(180deg,#031025,#071124);border-radius:8px;display:flex;align-items:center;justify-content:center}
+    .small{font-size:13px;color:var(--muted)}
+    .credits{font-size:12px;color:var(--muted);margin-top:8px}
+    select{padding:8px;border-radius:6px;border:0;background:rgba(255,255,255,0.02);color:inherit}
+    /* HUD */
+    .hud{position:absolute;left:24px;top:22px;color:#cfe9ff}
+    .cutscene{position:relative;background:linear-gradient(180deg, rgba(0,0,0,0.6), rgba(0,0,0,0.45));padding:20px;border-radius:8px}
+    .muted{color:var(--muted)}
+    .flex-between{display:flex;justify-content:space-between;align-items:center}
+    footer{margin-top:10px;color:var(--muted);font-size:12px}
+  </style>
 </head>
 <body>
+  <div id="app">
+    <div class="row">
+      <div class="viewport">
+        <div id="game-root" style="position:relative">
+          <canvas id="gameCanvas" width="900" height="600"></canvas>
+          <div id="ui" style="position:absolute;left:18px;top:18px;"></div>
+        </div>
+      </div>
+      <div class="sidebar">
+        <h1>Echoes Prototype — Menu</h1>
+        <div class="menu">
+          <button id="btnStart">Start Game</button>
+          <button id="btnLevelSelect" class="btn-flat">Level Select</button>
+          <button id="btnSettings" class="btn-flat">Settings</button>
+          <div style="margin-top:6px">
+            <label class="small">Character Color</label>
+            <input id="charColor" type="color" value="#8be9fd" />
+          </div>
+          <div>
+            <label class="small">Hair / Hat</label>
+            <select id="charHat">
+              <option value="none">None</option>
+              <option value="cap">Cap</option>
+              <option value="hood">Hood</option>
+              <option value="crown">Crown</option>
+            </select>
+          </div>
+          <div class="preview" id="preview">
+            <canvas id="previewCanvas" width="240" height="90"></canvas>
+          </div>
+          <div class="small muted">Controls: Arrow keys / WASD to move, Space to dash, Enter to interact</div>
+          <div class="credits">Prototype — single-file. Use this as a base to expand levels, art, and sound.</div>
+        </div>
+      </div>
+    </div>
+    <footer class="flex-between"><div class="small muted">Made for school project — press Start to play</div><div class="small muted">Version 1.0</div></footer>
+  </div>
 
-<audio id="bgMusic" loop>
-  <source src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" type="audio/mpeg">
-</audio>
+  <script>
+  // =====================
+  // Echoes of Yourself — Single-file JS Game Prototype
+  // Features:
+  // - Main menu with character customization (color + hat)
+  // - Multiple levels + boss levels
+  // - Cutscenes as scripted sequences between levels
+  // - Echo clones mechanic (demonstrative simplified)
+  // - Simple AI for enemies and bosses
+  // - Modular but contained code for easy expansion
+  // =====================
 
-<div id="hud">
-  <span id="healthBar">Lives: 3</span>
-  <button id="pauseBtn">Pause</button>
-  <button id="restartBtn">Restart</button>
-  <button id="musicBtn">Music: On</button>
-</div>
+  (() => {
+    // Canvas setup
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const W = canvas.width, H = canvas.height;
 
-<canvas id="gameCanvas" width="900" height="500"></canvas>
-<div id="cutscene"></div>
+    const previewCanvas = document.getElementById('previewCanvas');
+    const pctx = previewCanvas.getContext('2d');
 
-<script>
-const canvas = document.getElementById('gameCanvas');
-const ctx = canvas.getContext('2d');
-const cutsceneDiv = document.getElementById('cutscene');
-const bgMusic = document.getElementById('bgMusic');
-const healthBar = document.getElementById('healthBar');
-const pauseBtn = document.getElementById('pauseBtn');
-const restartBtn = document.getElementById('restartBtn');
-const musicBtn = document.getElementById('musicBtn');
+    // UI elements
+    const btnStart = document.getElementById('btnStart');
+    const btnLevelSelect = document.getElementById('btnLevelSelect');
+    const btnSettings = document.getElementById('btnSettings');
+    const charColorIn = document.getElementById('charColor');
+    const charHat = document.getElementById('charHat');
 
-let paused=false, musicOn=true, inCutscene=true;
-let images = {};
-
-// HUD buttons
-pauseBtn.addEventListener('click', ()=> paused=!paused);
-restartBtn.addEventListener('click', ()=> restartLevel());
-musicBtn.addEventListener('click', ()=>{
-  musicOn = !musicOn;
-  musicOn ? bgMusic.play() : bgMusic.pause();
-  musicBtn.innerText = "Music: "+(musicOn?"On":"Off");
-});
-
-// Player
-let player = { x:50, y:400, width:40, height:50, color:'cyan', speed:5, vy:0, onGround:false, lives:3 };
-let keys = {};
-document.addEventListener('keydown', e=>keys[e.key.toLowerCase()]=true);
-document.addEventListener('keyup', e=>keys[e.key.toLowerCase()]=false);
-
-// Levels
-const maps = [
-  {
-    bg:'https://i.ibb.co/1JpY9H3/bg1.jpg',
-    platforms:[ {x:0,y:450,width:900,height:50},{x:200,y:350,width:120,height:20},{x:450,y:300,width:120,height:20},{x:700,y:250,width:120,height:20}],
-    enemies:[ {x:300,y:400,width:40,height:40,color:'red',dir:1,speed:2} ],
-    puzzle:{x:750,y:200,width:40,height:40,solved:false},
-    passage:{x:820,y:220,width:60,height:60,active:false},
-    cutscenes:["Kael enters the ruins, shadows stir...","Avoid the guardians and solve the ancient puzzle!"]
-  },
-  {
-    bg:'https://i.ibb.co/2n6dkK5/bg2.jpg',
-    platforms:[ {x:0,y:450,width:900,height:50},{x:150,y:380,width:100,height:20,move:true,dir:1,speed:1},{x:350,y:320,width:150,height:20,move:true,dir:-1,speed:1.5},{x:600,y:260,width:150,height:20},{x:750,y:200,width:100,height:20}],
-    enemies:[ {x:200,y:400,width:40,height:40,color:'red',dir:1,speed:2.5},{x:500,y:350,width:40,height:60,color:'darkred',dir:-1,speed:1.2}],
-    puzzle:{x:770,y:160,width:40,height:40,solved:false},
-    passage:{x:820,y:180,width:60,height:60,active:false},
-    cutscenes:["Level 2: The shadows grow restless...","Move quickly and solve the puzzle before they reach you!"]
-  }
-];
-
-let currentLevel=0, level=maps[currentLevel], currentCutscene=0;
-let particles=[], bullets=[];
-
-// Preload images
-function preloadImages(urls, callback){
-  let loaded=0;
-  urls.forEach(url=>{
-    let img = new Image();
-    img.src = url;
-    img.onload = ()=>{
-      loaded++;
-      if(loaded === urls.length) callback();
+    // Game state
+    const STATE = {
+      mode: 'menu', // menu, playing, cutscene, paused
+      currentLevel: 0,
+      levels: [],
+      player: null,
+      entities: [],
+      echoes: [],
+      keys: {},
+      lastTimestamp: 0,
+      cutscene: null,
+      score:0
     };
-    images[url] = img;
-  });
-}
 
-// Cutscene
-function showCutscene(text){
-  cutsceneDiv.style.display='flex';
-  cutsceneDiv.innerText=text;
-}
-cutsceneDiv.addEventListener('click', ()=>{
-  currentCutscene++;
-  if(currentCutscene<level.cutscenes.length) showCutscene(level.cutscenes[currentCutscene]);
-  else { cutsceneDiv.style.display='none'; inCutscene=false; if(musicOn) bgMusic.play(); }
-});
+    // Helper utils
+    function clamp(v,a,b){return Math.max(a,Math.min(b,v))}
+    function rand(min,max){return Math.random()*(max-min)+min}
 
-// Collision
-function rectCollision(a,b){ return a.x < b.x+b.width && a.x+a.width > b.x && a.y < b.y+b.height && a.y+a.height > b.y; }
+    // ------------------
+    // Player class
+    class Player{
+      constructor(x,y,color){
+        this.x=x;this.y=y;this.vx=0;this.vy=0;this.w=28;this.h=36;this.color=color;
+        this.speed=170;this.onGround=false;this.health=100;this.dashCooldown=0;this.facing=1;
+        this.recording=[]; // record inputs for echo
+      }
+      update(dt){
+        // Input
+        let move=0;if(STATE.keys.ArrowLeft||STATE.keys.KeyA){move-=1}if(STATE.keys.ArrowRight||STATE.keys.KeyD){move+=1}
+        if(move!==0) this.facing = move>0?1:-1;
+        this.vx = move * this.speed;
+        // Simple gravity + ground
+        this.vy += 600*dt;
+        this.x += this.vx*dt;
+        this.y += this.vy*dt;
+        if(this.y > H-60){this.y = H-60;this.vy=0;this.onGround=true}
 
-// Gravity
-function applyGravity(player){
-  player.vy += 0.8;
-  player.y += player.vy;
-  player.onGround=false;
-  for(let plat of level.platforms){
-    if(rectCollision(player,{...plat,height:1})){
-      player.y = plat.y - player.height;
-      player.vy=0;
-      player.onGround=true;
+        // Dash
+        if((STATE.keys.Space || STATE.keys.KeyX) && this.dashCooldown<=0){
+          this.vx += this.facing*400; this.dashCooldown = 0.8;
+          // create small after-effect
+        }
+        this.dashCooldown = Math.max(0, this.dashCooldown - dt);
+
+        // record input snapshot for echoes
+        this.recording.push({x:this.x,y:this.y,vx:this.vx,vy:this.vy, facing:this.facing});
+        if(this.recording.length>600) this.recording.shift();
+
+        // Bounds
+        this.x = clamp(this.x, 10, W-10-this.w);
+      }
+      draw(ctx){
+        // body
+        ctx.save();
+        ctx.translate(this.x+this.w/2, this.y+this.h/2);
+        // shadow
+        ctx.fillStyle='rgba(0,0,0,0.18)'; ctx.beginPath(); ctx.ellipse(0, this.h/2 + 6, this.w/2+6, 8, 0,0,Math.PI*2); ctx.fill();
+        ctx.fillStyle = this.color; ctx.fillRect(-this.w/2,-this.h/2,this.w,this.h);
+        // face
+        ctx.fillStyle='#061224'; ctx.fillRect(-8,-8,6,6); ctx.fillRect(2,-8,6,6);
+        // hat
+        const hat = charHat.value;
+        if(hat==='cap'){
+          ctx.fillStyle='#222'; ctx.fillRect(-14,-18,28,6);
+        } else if(hat==='hood'){
+          ctx.strokeStyle='#fff'; ctx.beginPath(); ctx.arc(0,-2,20,Math.PI*1.1,Math.PI*1.9); ctx.stroke();
+        } else if(hat==='crown'){
+          ctx.fillStyle='#ffcc33'; ctx.beginPath(); ctx.moveTo(-14,-16); ctx.lineTo(-6,-6); ctx.lineTo(0,-14); ctx.lineTo(6,-6); ctx.lineTo(14,-16); ctx.closePath(); ctx.fill();
+        }
+        ctx.restore();
+      }
     }
-  }
-}
 
-// Restart
-function restartLevel(){
-  player.x=50; player.y=400; player.vy=0; player.lives=3;
-  level.puzzle.solved=false;
-  level.passage.active=false;
-  particles=[]; bullets=[];
-  inCutscene=true; currentCutscene=0;
-  healthBar.innerText='Lives: '+player.lives;
-  showCutscene(level.cutscenes[0]);
-}
+    // Echo clone - replays recorded snapshots
+    class Echo{
+      constructor(recording, startTime, color){
+        this.recording = recording.slice();
+        this.time=0; this.idx=0; this.x = this.recording[0]?.x||0; this.y=this.recording[0]?.y||0; this.color=color;
+      }
+      update(dt){
+        this.time += dt;
+        // play back at frame rate ~60 fps * same speed
+        this.idx = Math.floor(this.time * 60);
+        if(this.idx >= this.recording.length) { this.dead = true; return; }
+        const s = this.recording[this.idx];
+        if(s){this.x = s.x; this.y = s.y;}
+      }
+      draw(ctx){
+        ctx.save(); ctx.globalAlpha = 0.55; ctx.translate(this.x+14,this.y+18);
+        ctx.fillStyle = this.color; ctx.fillRect(-14,-18,28,36);
+        ctx.globalAlpha = 1; ctx.restore();
+      }
+    }
 
-// Particles
-function spawnParticles(x,y){
-  for(let i=0;i<15;i++){ particles.push({x:x, y:y, vx:(Math.random()-0.5)*4, vy:(Math.random()-1.5)*3, life:30}); }
-}
-function updateParticles(){
-  particles.forEach(p=>{ p.x+=p.vx; p.y+=p.vy; p.vy+=0.1; p.life--; ctx.fillStyle='yellow'; ctx.fillRect(p.x,p.y,2,2); });
-  particles = particles.filter(p=>p.life>0);
-}
+    // Enemy class
+    class Enemy{
+      constructor(x,y,type='grunt'){
+        this.x=x;this.y=y;this.w=30;this.h=34;this.type=type;this.vx=0;this.health = type==='boss'?500:60;this.ang=0;this.state='idle';
+      }
+      update(dt){
+        this.ang += dt;
+        if(this.type==='grunt'){
+          // simple patrol
+          this.x += Math.sin(this.ang*1.2)*30*dt;
+        } else if(this.type==='boss'){
+          // boss behavior handled separately
+        }
+      }
+      draw(ctx){
+        ctx.save(); ctx.translate(this.x+this.w/2,this.y+this.h/2);
+        ctx.fillStyle = (this.type==='boss')? '#ff6b6b' : '#ffb86b';
+        ctx.fillRect(-this.w/2,-this.h/2,this.w,this.h);
+        if(this.type==='boss'){
+          ctx.fillStyle='#fff'; ctx.fillText('BOSS', -18, 6);
+        }
+        ctx.restore();
+      }
+    }
 
-// Game Loop
-function gameLoop(){
-  if(!paused){
-    // Background
-    ctx.drawImage(images[level.bg],0,0,canvas.width,canvas.height);
+    // Simple level definitions
+    function makeLevels(){
+      return [
+        {
+          id:0, name:'Ravenwood Edge', music:null, enemies:[{x:380,y:460},{x:560,y:460}], boss:false, cutscene: {text:'The woods whisper... Find the fragments of memory.'}
+        },
+        {
+          id:1, name:'Forgotten Cemetery', enemies:[{x:260,y:460},{x:460,y:460},{x:720,y:460}], boss:false, cutscene:{text:'Shadows deepen. Echoes stir.'}
+        },
+        {
+          id:2, name:'Eldritch Shrine — Boss', enemies:[{x:420,y:420,type:'boss'}], boss:true, cutscene:{text:'The Wraithcaller awakes...'}
+        }
+      ];
+    }
 
-    if(!inCutscene){
-      // Gravity & movement
-      applyGravity(player);
-      if(keys['arrowleft']) player.x -= player.speed;
-      if(keys['arrowright']) player.x += player.speed;
-      if(keys['arrowup'] && player.onGround) player.vy=-15;
+    // Cutscene manager (very lightweight)
+    class Cutscene{
+      constructor(script, onEnd){
+        this.script = script; this.t=0; this.step=0; this.onEnd=onEnd; this.active=true;
+      }
+      update(dt){
+        this.t+=dt; if(this.t>3.2){this.step++; this.t=0}
+        if(this.step >= this.script.length){this.active=false; if(this.onEnd) this.onEnd();}
+      }
+      draw(ctx){
+        ctx.save(); ctx.fillStyle='rgba(0,0,0,0.6)'; ctx.fillRect(40,380,820,160);
+        ctx.fillStyle='#cfe9ff'; ctx.font='20px Inter'; ctx.fillText(this.script[this.step] || '', 70, 430);
+        ctx.restore();
+      }
+    }
 
-      // Moving platforms
-      level.platforms.forEach(plat=>{
-        if(plat.move){
-          plat.x += plat.dir*plat.speed;
-          if(plat.x<=0 || plat.x+plat.width>=canvas.width) plat.dir*=-1;
+    // Level loader
+    function loadLevel(idx){
+      STATE.entities = [];
+      STATE.echoes = [];
+      const lvl = STATE.levels[idx];
+      STATE.player = new Player(90, H-120, charColorIn.value);
+      // spawn enemies
+      lvl.enemies.forEach(e=>{
+        const en = new Enemy(e.x, e.y, e.type || 'grunt'); STATE.entities.push(en);
+      });
+      STATE.mode='cutscene';
+      STATE.cutscene = new Cutscene([lvl.cutscene.text, 'Prepare...','Go!'], ()=>{ STATE.mode='playing'; });
+      STATE.currentLevel = idx;
+    }
+
+    // Start boss fight special
+    function spawnBoss(){
+      const boss = new Enemy(W/2 - 40, 200, 'boss'); boss.w=120; boss.h=120; boss.health=500; boss.state='idle';
+      boss.update = function(dt){
+        // boss pattern: hover + slam
+        this.ang += dt; this.x = W/2 - 60 + Math.sin(this.ang)*140; this.y = 150 + Math.cos(this.ang*1.8)*30;
+        // shoot pulses occasionally (we simulate damage area)
+      };
+      STATE.entities.push(boss);
+    }
+
+    // Game loop
+    function update(dt){
+      if(STATE.mode==='menu') return;
+      if(STATE.mode==='cutscene'){
+        if(STATE.cutscene){ STATE.cutscene.update(dt); if(!STATE.cutscene.active){ STATE.mode='playing'; if(STATE.levels[STATE.currentLevel].boss) spawnBoss(); }}
+        return;
+      }
+      if(!STATE.player) return;
+      STATE.player.update(dt);
+      STATE.entities.forEach(e=>e.update(dt));
+      STATE.echoes.forEach(ec=>ec.update(dt));
+      STATE.echoes = STATE.echoes.filter(ec=>!ec.dead);
+
+      // simple collision detection: player hits enemy
+      STATE.entities.forEach(e=>{
+        if(Math.abs((STATE.player.x+14)-(e.x+e.w/2)) < 30 && Math.abs((STATE.player.y+18)-(e.y+e.h/2))<36){
+          // take damage simple
+          STATE.player.health -= 0.2;
         }
       });
 
-      // Platforms
-      ctx.fillStyle='rgba(100,100,100,0.8)';
-      level.platforms.forEach(plat=>ctx.fillRect(plat.x,plat.y,plat.width,plat.height));
-
-      // Player
-      ctx.fillStyle=player.color;
-      ctx.fillRect(player.x,player.y,player.width,player.height);
-
-      // Enemies
-      level.enemies.forEach(enemy=>{
-        enemy.x += enemy.dir*enemy.speed;
-        if(enemy.x<=0||enemy.x+enemy.width>=canvas.width) enemy.dir*=-1;
-        ctx.fillStyle=enemy.color;
-        ctx.fillRect(enemy.x,enemy.y,enemy.width,enemy.height);
-        if(rectCollision(player,enemy)){
-          player.lives--;
-          healthBar.innerText='Lives: '+player.lives;
-          player.x=50; player.y=400; player.vy=0;
-          if(player.lives<=0){ inCutscene=true; showCutscene("You have perished! Try again..."); restartLevel(); }
-        }
-      });
-
-      // Puzzle
-      ctx.fillStyle=level.puzzle.solved ? 'green' : (rectCollision(player,level.puzzle)?'orange':'yellow');
-      ctx.fillRect(level.puzzle.x,level.puzzle.y,level.puzzle.width,level.puzzle.height);
-      if(rectCollision(player,level.puzzle) && keys['e'] && !level.puzzle.solved){
-        level.puzzle.solved=true;
-        level.passage.active=true;
-        spawnParticles(level.puzzle.x+20, level.puzzle.y+20);
-        inCutscene=true;
-        showCutscene("Puzzle solved! A passage has opened!");
+      // level clear check
+      const aliveEnemies = STATE.entities.filter(e=>e.type!=='boss');
+      const aliveBoss = STATE.entities.find(e=>e.type==='boss');
+      if(aliveEnemies.length===0 && !aliveBoss && !STATE.levels[STATE.currentLevel].boss){
+        // spawn an echo of player recording as reward and play next cutscene
+        STATE.echoes.push(new Echo(STATE.player.recording, 0, STATE.player.color));
+        setTimeout(()=>{ loadLevel(Math.min(STATE.levels.length-1, STATE.currentLevel+1)); }, 500);
       }
-
-      // Passage
-      if(level.passage.active){
-        ctx.fillStyle='lightblue';
-        ctx.fillRect(level.passage.x,level.passage.y,level.passage.width,level.passage.height);
-        if(rectCollision(player,level.passage)){
-          currentLevel++;
-          if(currentLevel >= maps.length){
-            inCutscene=true;
-            showCutscene("Congratulations! You completed all levels!");
-          } else {
-            level = maps[currentLevel];
-            restartLevel();
-          }
-        }
+      if(aliveBoss && aliveBoss.health<=0){
+        // beat boss — win
+        STATE.mode='cutscene'; STATE.cutscene = new Cutscene(['The Wraithcaller falters...','Memory returns. You win.'], ()=>{ STATE.mode='menu'; });
       }
-
-      // Particles
-      updateParticles();
     }
-  }
 
-  requestAnimationFrame(gameLoop);
-}
+    // draw
+    function draw(){
+      // background
+      ctx.clearRect(0,0,W,H);
+      // gradient sky
+      const g = ctx.createLinearGradient(0,0,0,H); g.addColorStop(0,'#081028'); g.addColorStop(1,'#071124'); ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+      // ground
+      ctx.fillStyle = '#071220'; ctx.fillRect(0,H-60,W,60);
+      // ambient
+      ctx.fillStyle='rgba(139,233,253,0.02)'; ctx.fillRect(0,0,W,H);
 
-// Start
-preloadImages(maps.map(m=>m.bg), ()=>{
-  showCutscene(level.cutscenes[0]);
-  gameLoop();
-});
+      // entities
+      STATE.entities.forEach(e=>e.draw(ctx));
+      STATE.echoes.forEach(ec=>ec.draw(ctx));
+      if(STATE.player) STATE.player.draw(ctx);
+
+      // HUD
+      ctx.fillStyle='#cfe9ff'; ctx.font='14px Inter'; ctx.fillText('Level: '+(STATE.levels[STATE.currentLevel]?.name || '—'), 620, 30);
+      ctx.fillText('Health: '+Math.max(0,Math.floor(STATE.player?.health||0)), 620, 50);
+
+      // cutscene overlay
+      if(STATE.mode==='cutscene' && STATE.cutscene){ STATE.cutscene.draw(ctx); }
+    }
+
+    // main animation frame
+    function loop(ts){
+      if(!STATE.lastTimestamp) STATE.lastTimestamp = ts; const dt = Math.min(0.05,(ts-STATE.lastTimestamp)/1000); STATE.lastTimestamp = ts;
+      update(dt); draw(); requestAnimationFrame(loop);
+    }
+
+    // Input
+    window.addEventListener('keydown',(e)=>{ STATE.keys[e.code]=true; if(e.code==='Enter' && STATE.mode==='menu'){ loadLevel(0); } });
+    window.addEventListener('keyup',(e)=>{ STATE.keys[e.code]=false; });
+
+    // UI events
+    btnStart.addEventListener('click', ()=>{ loadLevel(0); });
+    btnLevelSelect.addEventListener('click', ()=>{ STATE.mode='menu'; alert('Level Select (prototype) — use Start or edit code to jump to a level.'); });
+    btnSettings.addEventListener('click', ()=>{ alert('Settings are minimal in prototype. Use color picker and hat select.'); });
+
+    // Reflect character preview
+    function drawPreview(){
+      pctx.clearRect(0,0,previewCanvas.width,previewCanvas.height);
+      pctx.fillStyle='#041026'; pctx.fillRect(0,0,previewCanvas.width,previewCanvas.height);
+      // draw small avatar
+      const px = previewCanvas.width/2 - 10, py = previewCanvas.height/2 - 10;
+      pctx.fillStyle=charColorIn.value; pctx.fillRect(px,py,20,28);
+      // hat
+      const hat = charHat.value;
+      pctx.fillStyle='#222'; if(hat==='cap') pctx.fillRect(px-6,py-6,32,6);
+      if(hat==='crown') { pctx.fillStyle='#ffcc33'; pctx.beginPath(); pctx.moveTo(px-6,py-6); pctx.lineTo(px-2,py+4); pctx.lineTo(px+6,py-6); pctx.lineTo(px+14,py+4); pctx.lineTo(px+20,py-6); pctx.closePath(); pctx.fill(); }
+    }
+    charColorIn.addEventListener('input', ()=>{ if(STATE.player) STATE.player.color=charColorIn.value; drawPreview(); });
+    charHat.addEventListener('change', ()=>{ drawPreview(); });
+    drawPreview();
+
+    // init levels
+    STATE.levels = makeLevels();
+    // start loop
+    requestAnimationFrame(loop);
+
+    // expose for debugging
+    window.GAME = STATE;
+
+  })();
+  </script>
+</body>
+</html>
+
 </script>
 </body>
 </html>
