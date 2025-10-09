@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Echoes of Yourself — Expanded Prototype</title>
+  <title>Echoes of Yourself — Expanded Prototype (Stable)</title>
   <style>
     :root{--bg:#0b0f1a;--panel:#0f1724;--accent:#8be9fd;--muted:#98a0b3}
     html,body{height:100%;margin:0;font-family:Inter,Segoe UI,system-ui,Arial}
@@ -39,7 +39,7 @@
         </div>
       </div>
       <div class="sidebar">
-        <h1>Echoes — Expanded Menu</h1>
+        <h1>Echoes — Stable Menu</h1>
         <div class="menu">
           <button id="btnStart">Continue / Start</button>
           <button id="btnLevelSelect" class="btn-flat">Level Select</button>
@@ -71,24 +71,20 @@
           <div class="small muted">Quick Level Select</div>
           <div class="level-list" id="levelList"></div>
 
-          <div class="credits">Prototype — expanded. Save/load, more levels, bosses, cinematic cutscenes included.</div>
+          <div class="credits">Prototype — stable baseline. Core systems reviewed and fixed.</div>
         </div>
       </div>
     </div>
   </div>
 
   <script>
-  // =====================
-  // Echoes of Yourself — Expanded Single-file JS Game Prototype
-  // New features added:
-  // - 8 levels (including 2 boss levels) + progression
-  // - Cinematic cutscenes with portraits
-  // - Level select UI with unlocks
-  // - Save/Load (localStorage) for progress, XP, coins, customizations
-  // - Upgrades / inventory (simple)
-  // - Improved boss AI and enemy waves
-  // - Echo clones persist as helpful tools
-  // =====================
+  // ===============
+  // Stable core patch applied:
+  // - Fixed entity deletion during iteration (now marks dead, then filters)
+  // - Inventory purchase deducts both STATE and saved coins
+  // - Enter key in menu continues from saved unlocked level (not always level 1)
+  // - Minor stability tweaks and comments
+  // ===============
 
   (() => {
     const canvas = document.getElementById('gameCanvas');
@@ -112,7 +108,12 @@
     function loadSave(){
       try{ const s = JSON.parse(localStorage.getItem(SAVE_KEY)||'{}'); return Object.assign({unlocked:1, xp:0, coins:0, custom:{color:'#8be9fd',hat:'none'}}, s); }catch(e){return {unlocked:1,xp:0,coins:0,custom:{color:'#8be9fd',hat:'none'}}}
     }
-    function saveGame(){ localStorage.setItem(SAVE_KEY, JSON.stringify({unlocked:saveData.unlocked, xp:saveData.xp, coins:saveData.coins, custom:saveData.custom})); }
+    function saveGame(){
+      // keep saveData in sync with STATE
+      saveData.xp = STATE.xp; saveData.coins = STATE.coins; saveData.unlocked = saveData.unlocked; saveData.custom = saveData.custom;
+      localStorage.setItem(SAVE_KEY, JSON.stringify({unlocked:saveData.unlocked, xp:saveData.xp, coins:saveData.coins, custom:saveData.custom}));
+      updateSidebar();
+    }
     const saveData = loadSave();
 
     const STATE = { mode:'menu', currentLevel:0, levels:[], player:null, entities:[], echoes:[], keys:{}, lastTimestamp:0, cutscene:null, xp:saveData.xp, coins:saveData.coins };
@@ -128,7 +129,7 @@
         let move=0; if(STATE.keys.ArrowLeft||STATE.keys.KeyA) move-=1; if(STATE.keys.ArrowRight||STATE.keys.KeyD) move+=1; if(move!==0) this.facing = move>0?1:-1; this.vx = move*this.speed; this.vy += 800*dt; this.x += this.vx*dt; this.y += this.vy*dt; if(this.y>H-70){this.y=H-70;this.vy=0;this.onGround=true}
         if((STATE.keys.Space||STATE.keys.KeyX) && this.dashCooldown<=0){ this.vx += this.facing*420; this.dashCooldown = 0.9; }
         this.dashCooldown = Math.max(0, this.dashCooldown - dt);
-        // record
+        // record position snapshot for echoes
         this.recording.push({x:this.x,y:this.y}); if(this.recording.length>900) this.recording.shift();
         this.x = clamp(this.x,10,W-10-this.w);
       }
@@ -139,15 +140,10 @@
     class Echo{ constructor(recording,color){ this.recording = recording.slice(); this.t=0; this.idx=0; this.x=this.recording[0]?.x||0; this.y=this.recording[0]?.y||0; this.color=color; } update(dt){ this.t += dt; this.idx = Math.floor(this.t*60); if(this.idx >= this.recording.length) { this.dead=true; return; } const s = this.recording[this.idx]; if(s){ this.x=s.x; this.y=s.y; } } draw(ctx){ ctx.save(); ctx.globalAlpha=0.5; ctx.translate(this.x+14,this.y+18); ctx.fillStyle=this.color; ctx.fillRect(-14,-18,28,36); ctx.restore(); } }
 
     // Enemy
-    class Enemy{ constructor(x,y,type='grunt'){ this.x=x;this.y=y;this.w=30;this.h=34;this.type=type;this.vx=0;this.health = type==='boss'?400:60;this.ang=rand(0,Math.PI*2);this.state='idle'; } update(dt){ this.ang += dt; if(this.type==='grunt'){ this.x += Math.sin(this.ang*1.6)*40*dt; } else if(this.type==='shooter'){ this.x += Math.cos(this.ang*0.9)*20*dt; } } draw(ctx){ ctx.save(); ctx.translate(this.x+this.w/2,this.y+this.h/2); ctx.fillStyle=(this.type==='boss')?'#ff6b6b':(this.type==='shooter'?'#a6ffb0':'#ffb86b'); ctx.fillRect(-this.w/2,-this.h/2,this.w,this.h); if(this.type==='boss'){ ctx.fillStyle='#fff'; ctx.fillText('BOSS', -18, 6); } ctx.restore(); } }
+    class Enemy{ constructor(x,y,type='grunt'){ this.x=x;this.y=y;this.w=30;this.h=34;this.type=type;this.vx=0;this.health = type==='boss'?400:60;this.ang=rand(0,Math.PI*2);this.state='idle'; this._dead=false; } update(dt){ this.ang += dt; if(this.type==='grunt'){ this.x += Math.sin(this.ang*1.6)*40*dt; } else if(this.type==='shooter'){ this.x += Math.cos(this.ang*0.9)*20*dt; } } draw(ctx){ ctx.save(); ctx.translate(this.x+this.w/2,this.y+this.h/2); ctx.fillStyle=(this.type==='boss')?'#ff6b6b':(this.type==='shooter'?'#a6ffb0':'#ffb86b'); ctx.fillRect(-this.w/2,-this.h/2,this.w,this.h); if(this.type==='boss'){ ctx.fillStyle='#fff'; ctx.fillText('BOSS', -18, 6); } ctx.restore(); } }
 
     // Boss behaviors
-    function spawnBossPattern(boss){ boss.phase = 0; boss.timer = 0; boss.update = function(dt){ this.timer += dt; if(this.phase===0){ this.x += Math.sin(this.timer*1.2)*120*dt; this.y = 120 + Math.cos(this.timer*0.9)*20; if(this.timer>6){ this.phase=1; this.timer=0; } } else if(this.phase===1){ // slam
-          if(this.timer>0.8){ // quick slam to player x
-            const targetX = (STATE.player.x||W/2); this.x += (targetX - this.x) * dt * 3; this.y += 200*dt; if(this.y>H-120){ this.y = 120; this.phase=0; this.timer=0; }
-          }
-        }
-      }; }
+    function spawnBossPattern(boss){ boss.phase = 0; boss.timer = 0; boss.update = function(dt){ this.timer += dt; if(this.phase===0){ this.x += Math.sin(this.timer*1.2)*120*dt; this.y = 120 + Math.cos(this.timer*0.9)*20; if(this.timer>6){ this.phase=1; this.timer=0; } } else if(this.phase===1){ if(this.timer>0.8){ const targetX = (STATE.player.x||W/2); this.x += (targetX - this.x) * dt * 3; this.y += 200*dt; if(this.y>H-120){ this.y = 120; this.phase=0; this.timer=0; } } } }; }
 
     // Level definitions - more detailed
     function makeLevels(){
@@ -164,41 +160,41 @@
     }
 
     // Cutscene manager - supports portrait slide
-    class Cutscene{ constructor(lines, portrait, onEnd){ this.lines = lines; this.portrait = portrait; this.step=0; this.t=0; this.onEnd=onEnd; this.active=true; } update(dt){ this.t+=dt; if(this.t>3.2){ this.step++; this.t=0; } if(this.step >= this.lines.length){ this.active=false; if(this.onEnd) this.onEnd(); } } draw(ctx){ ctx.save(); ctx.fillStyle='rgba(0,0,0,0.7)'; ctx.fillRect(40,360,840,160); ctx.fillStyle='#cfe9ff'; ctx.font='18px Inter'; ctx.fillText(this.lines[this.step] || '', 140, 420); // portrait
-        if(this.portrait){ ctx.fillStyle=this.portrait; ctx.fillRect(60,390,64,64); }
-        ctx.restore(); } }
+    class Cutscene{ constructor(lines, portrait, onEnd){ this.lines = lines; this.portrait = portrait; this.step=0; this.t=0; this.onEnd=onEnd; this.active=true; } update(dt){ this.t+=dt; if(this.t>3.2){ this.step++; this.t=0; } if(this.step >= this.lines.length){ this.active=false; if(this.onEnd) this.onEnd(); } } draw(ctx){ ctx.save(); ctx.fillStyle='rgba(0,0,0,0.7)'; ctx.fillRect(40,360,840,160); ctx.fillStyle='#cfe9ff'; ctx.font='18px Inter'; ctx.fillText(this.lines[this.step] || '', 140, 420); if(this.portrait){ ctx.fillStyle=this.portrait; ctx.fillRect(60,390,64,64); } ctx.restore(); } }
 
     function loadLevel(idx, fromMenu=false){ STATE.entities=[]; STATE.echoes=[]; const lvl = STATE.levels[idx]; STATE.player = new Player(90,H-120, saveData.custom.color); STATE.player.coins = 0; STATE.currentLevel = idx; // spawn enemies
       lvl.enemies.forEach(e=>{ const en = new Enemy(e.x,e.y,e.type||'grunt'); STATE.entities.push(en); });
-      STATE.mode='cutscene'; STATE.cutscene = new Cutscene(lvl.cutscene, '#8be9fd', ()=>{ STATE.mode='playing'; if(lvl.boss){ // spawn boss
-          const boss = new Enemy(W/2 - 60, 140, 'boss'); boss.w=140; boss.h=140; boss.health = 800; spawnBossPattern(boss); STATE.entities.push(boss); }
-        }); }
+      STATE.mode='cutscene'; STATE.cutscene = new Cutscene(lvl.cutscene, '#8be9fd', ()=>{ STATE.mode='playing'; if(lvl.boss){ const boss = new Enemy(W/2 - 60, 140, 'boss'); boss.w=140; boss.h=140; boss.health = 800; spawnBossPattern(boss); STATE.entities.push(boss); } }); }
 
     // Start-level reward/next handling
-    function onLevelComplete(){ // award XP & coins, unlock next
-      const lvl = STATE.levels[STATE.currentLevel]; const awardXP = 50 + STATE.currentLevel*10; const coins = 10 + STATE.currentLevel*5; STATE.xp += awardXP; STATE.coins += coins; saveData.xp = STATE.xp; saveData.coins = STATE.coins; saveData.unlocked = Math.max(saveData.unlocked, STATE.currentLevel+2); saveGame(); updateSidebar(); }
+    function onLevelComplete(){ const lvl = STATE.levels[STATE.currentLevel]; const awardXP = 50 + STATE.currentLevel*10; const coins = 10 + STATE.currentLevel*5; STATE.xp += awardXP; STATE.coins += coins; // keep saveData synced
+      saveData.xp = STATE.xp; saveData.coins = STATE.coins; saveData.unlocked = Math.max(saveData.unlocked, STATE.currentLevel+2); saveGame(); updateSidebar(); }
 
     // Game loop
     function update(dt){ if(STATE.mode==='menu') return; if(STATE.mode==='cutscene'){ if(STATE.cutscene){ STATE.cutscene.update(dt); if(!STATE.cutscene.active){ STATE.mode='playing'; } } return; }
       if(!STATE.player) return; STATE.player.update(dt); STATE.entities.forEach(e=>e.update(dt)); STATE.echoes.forEach(ec=>ec.update(dt)); STATE.echoes = STATE.echoes.filter(ec=>!ec.dead);
       // collisions and combat
-      STATE.entities.forEach((e,i)=>{ if(Math.abs((STATE.player.x+14)-(e.x+e.w/2))<36 && Math.abs((STATE.player.y+18)-(e.y+e.h/2))<44){ // collision
-            // simple interaction: damage both ways
-            STATE.player.health -= (e.type==='boss')?0.6:0.18; if(STATE.player.health<0) STATE.player.health=0; if(e.type!=='boss'){ e.health -= 60*dt; if(e.health<=0){ STATE.entities.splice(i,1); STATE.player.coins += 2; } } else { // boss takes tiny damage when colliding
-              e.health -= 12*dt; }
+      // mark-dead approach to avoid splice-in-loop bugs
+      STATE.entities.forEach((e)=>{ if(e._dead) return; if(Math.abs((STATE.player.x+14)-(e.x+e.w/2))<36 && Math.abs((STATE.player.y+18)-(e.y+e.h/2))<44){ // collision
+            STATE.player.health -= (e.type==='boss')?0.6:0.18; if(STATE.player.health<0) STATE.player.health=0; if(e.type!=='boss'){ e.health -= 60*dt; if(e.health<=0){ e._dead = true; STATE.player.coins += 2; } } else { e.health -= 12*dt; if(e.health<=0) e._dead = true; }
           } });
+      // remove dead entities after processing
+      const hadBoss = STATE.entities.some(e=>e.type==='boss');
+      STATE.entities = STATE.entities.filter(e=>!e._dead);
+
       // check boss death
-      const boss = STATE.entities.find(e=>e.type==='boss'); if(boss && boss.health<=0){ // boss defeated
+      const boss = STATE.entities.find(e=>e.type==='boss');
+      if(!boss && hadBoss && STATE.levels[STATE.currentLevel].boss){ // boss was present and now gone
         // create echo
         STATE.echoes.push(new Echo(STATE.player.recording, STATE.player.color));
         STATE.mode='cutscene'; STATE.cutscene = new Cutscene(['The boss collapses...','Memories return piece by piece.'], '#ff6b6b', ()=>{ onLevelComplete(); STATE.mode='menu'; }); }
+
       // check level clear (no enemies and not a boss level)
       const nonBoss = STATE.entities.filter(e=>e.type!=='boss'); if(nonBoss.length===0 && !STATE.levels[STATE.currentLevel].boss){ STATE.echoes.push(new Echo(STATE.player.recording, STATE.player.color)); onLevelComplete(); // short delay then next level
         setTimeout(()=>{ const next = Math.min(STATE.levels.length-1, STATE.currentLevel+1); loadLevel(next); }, 700); }
     }
 
-    function draw(){ ctx.clearRect(0,0,W,H); // background
-      const g = ctx.createLinearGradient(0,0,0,H); g.addColorStop(0,'#081028'); g.addColorStop(1,'#071124'); ctx.fillStyle=g; ctx.fillRect(0,0,W,H); ctx.fillStyle='#071220'; ctx.fillRect(0,H-60,W,60);
+    function draw(){ ctx.clearRect(0,0,W,H); const g = ctx.createLinearGradient(0,0,0,H); g.addColorStop(0,'#081028'); g.addColorStop(1,'#071124'); ctx.fillStyle=g; ctx.fillRect(0,0,W,H); ctx.fillStyle='#071220'; ctx.fillRect(0,H-60,W,60);
       // draw entities
       STATE.entities.forEach(e=>e.draw(ctx)); STATE.echoes.forEach(ec=>ec.draw(ctx)); if(STATE.player) STATE.player.draw(ctx);
       // HUD
@@ -210,17 +206,18 @@
     function loop(ts){ if(!STATE.lastTimestamp) STATE.lastTimestamp=ts; const dt = Math.min(0.05,(ts-STATE.lastTimestamp)/1000); STATE.lastTimestamp = ts; update(dt); draw(); requestAnimationFrame(loop); }
 
     // input
-    window.addEventListener('keydown',(e)=>{ STATE.keys[e.code]=true; if(e.code==='Enter' && STATE.mode==='menu'){ // continue
-          const lvl = Math.max(0, (saveData.unlocked-1)); loadLevel(0); } if(e.code==='KeyP'){ // pause toggle
+    window.addEventListener('keydown',(e)=>{ STATE.keys[e.code]=true; if(e.code==='Enter' && STATE.mode==='menu'){ // continue from saved progress
+          const startLevel = Math.max(0, (saveData.unlocked-1)); loadLevel(startLevel); } if(e.code==='KeyP'){ // pause toggle
           STATE.mode = (STATE.mode==='playing')?'paused':(STATE.mode==='paused'?'playing':STATE.mode); } });
     window.addEventListener('keyup',(e)=>{ STATE.keys[e.code]=false; });
 
     // UI handlers
-    btnStart.addEventListener('click', ()=>{ // continue from progress
-      const startLevel = Math.max(0, saveData.unlocked-1); loadLevel(startLevel); });
-    btnLevelSelect.addEventListener('click', ()=>{ // open quick selector UI
-      const choice = prompt('Enter level number (1-'+STATE.levels.length+') to jump to (unlocked up to '+saveData.unlocked+').'); const n = parseInt(choice); if(!isNaN(n) && n>=1 && n<=STATE.levels.length && n<=saveData.unlocked){ loadLevel(n-1); } else alert('Invalid or locked'); });
-    btnInventory.addEventListener('click', ()=>{ const buy = confirm('Spend 20 coins to increase max health by 20? (coins:'+STATE.coins+')'); if(buy){ if(saveData.coins>=20){ saveData.coins-=20; saveGame(); alert('Purchased!'); updateSidebar(); } else alert('Not enough coins'); } });
+    btnStart.addEventListener('click', ()=>{ const startLevel = Math.max(0, saveData.unlocked-1); loadLevel(startLevel); });
+    btnLevelSelect.addEventListener('click', ()=>{ const choice = prompt('Enter level number (1-'+STATE.levels.length+') to jump to (unlocked up to '+saveData.unlocked+').'); const n = parseInt(choice); if(!isNaN(n) && n>=1 && n<=STATE.levels.length && n<=saveData.unlocked){ loadLevel(n-1); } else alert('Invalid or locked'); });
+    btnInventory.addEventListener('click', ()=>{ // purchase example — correctly uses STATE and saveData
+      const cost = 20; if(STATE.coins >= cost){ if(confirm('Spend '+cost+' coins to increase max health by 20?')){ STATE.coins -= cost; saveData.coins = STATE.coins; // apply upgrade (simple example)
+            if(STATE.player) { STATE.player.maxHealth = (STATE.player.maxHealth || 100) + 20; STATE.player.health = Math.min(STATE.player.maxHealth, STATE.player.health + 20); }
+            saveGame(); alert('Purchased!'); } } else alert('Not enough coins'); });
 
     charColorIn.addEventListener('input', ()=>{ saveData.custom.color = charColorIn.value; saveGame(); drawPreview(); }); charHat.addEventListener('change', ()=>{ saveData.custom.hat = charHat.value; saveGame(); drawPreview(); });
 
@@ -233,7 +230,8 @@
     STATE.levels = makeLevels(); // apply saved customizations
     charColorIn.value = saveData.custom.color || '#8be9fd'; charHat.value = saveData.custom.hat || 'none'; drawPreview(); updateSidebar(); requestAnimationFrame(loop);
 
-    window.GAME = {STATE, saveData, loadLevel, saveGame};
+    // expose basic API for debugging and manual checks
+    window.GAME = {STATE, saveData, loadLevel, saveGame, updateSidebar};
   })();
   </script>
 </body>
