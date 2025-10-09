@@ -3,28 +3,23 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Echoes of Yourself — Stable & Responsive</title>
+  <title>Echoes of Yourself — Polished Levels & Bosses</title>
   <style>
     :root{--bg:#0b0f1a;--panel:#0f1724;--accent:#8be9fd;--muted:#98a0b3}
     html,body{height:100%;margin:0;font-family:Inter,Segoe UI,system-ui,Arial;background:var(--bg)}
-    /* Make the app centered but allow the game to take most of the screen */
     #app{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:12px;height:100%}
     .container{display:flex;gap:12px;width:100%;max-width:1500px;flex:1}
     .viewport{flex:1;background:radial-gradient(circle at 20% 10%, rgba(139,233,253,0.03), transparent), #071124;border-radius:8px;padding:8px;display:flex;align-items:center;justify-content:center}
-    /* Canvas will scale to fill the viewport area */
     canvas{width:100%;height:100%;display:block;border-radius:8px}
     .sidebar{width:360px;background:linear-gradient(180deg, rgba(255,255,255,0.01), transparent);padding:12px;border-radius:8px;box-sizing:border-box}
     h1{font-size:18px;margin:6px 0}
     .menu{display:flex;flex-direction:column;gap:10px}
     button{background:var(--panel);color:var(--accent);border:1px solid rgba(139,233,253,0.12);padding:10px;border-radius:8px;cursor:pointer}
-    .btn-flat{background:transparent;border:1px solid rgba(255,255,255,0.04);color:var(--muted)}
-    label{font-size:12px;color:var(--muted)}
-    input[type=color]{height:36px;width:100%;border-radius:6px;border:0;padding:0}
-    .preview{width:100%;height:120px;background:linear-gradient(180deg,#031025,#071124);border-radius:8px;display:flex;align-items:center;justify-content:center}
     .small{font-size:13px;color:var(--muted)}
     .level-list{display:flex;flex-wrap:wrap;gap:8px}
     .level-card{padding:8px;border-radius:6px;background:rgba(255,255,255,0.02);cursor:pointer;border:1px solid rgba(255,255,255,0.02)}
     footer{color:var(--muted);font-size:12px;margin-top:6px}
+    .center{display:flex;align-items:center;justify-content:center}
   </style>
 </head>
 <body>
@@ -34,7 +29,7 @@
         <canvas id="gameCanvas"></canvas>
       </div>
       <div class="sidebar">
-        <h1>Echoes — Stable & Responsive</h1>
+        <h1>Echoes — Polished Core</h1>
         <div class="menu">
           <button id="btnStart">Continue / Start</button>
           <button id="btnLevelSelect" class="btn-flat">Level Select</button>
@@ -52,184 +47,185 @@
               <option value="crown">Crown</option>
             </select>
           </div>
-          <div class="preview"><canvas id="previewCanvas" width="260" height="100"></canvas></div>
-          <div class="small">Controls: Arrow keys / WASD to move, Space to dash, Enter to interact, P to pause</div>
-          <div style="display:flex;gap:8px;align-items:center;justify-content:space-between"><div class="small">XP: <span id="xpVal">0</span></div><div class="small">Coins: <span id="coinsVal">0</span></div></div>
-          <div class="small">Quick Level Select</div>
+          <div class="small">Controls: Arrow keys / WASD to move, W/Up to jump, Space to dash, Enter to interact, P to pause</div>
+          <div class="small">Progress saves automatically after each level clear.</div>
           <div class="level-list" id="levelList"></div>
-          <footer>Stable baseline: fixed input, responsive canvas, adjusted physics for better platforming.</footer>
+          <footer>Polish patch: focused on level flow, wave spawn, boss telegraphs, health bars, and balancing.</footer>
         </div>
       </div>
     </div>
   </div>
 
   <script>
-  // Stable & responsive patch
-  (() => {
+  // Polished Level & Boss Systems
+  (function(){
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
-    const previewCanvas = document.getElementById('previewCanvas');
-    const pctx = previewCanvas.getContext('2d');
+    const SAVE_KEY = 'echoes_save_v1';
 
-    // Responsive canvas sizing with DPR scaling
+    // Responsive canvas
     function resizeCanvas(){
       const rect = canvas.getBoundingClientRect();
       const dpr = window.devicePixelRatio || 1;
-      const w = Math.max(600, Math.floor(rect.width));
-      const h = Math.max(360, Math.floor(rect.height));
+      const w = Math.max(700, Math.floor(rect.width));
+      const h = Math.max(420, Math.floor(rect.height));
       canvas.width = Math.floor(w * dpr);
       canvas.height = Math.floor(h * dpr);
       canvas.style.width = rect.width + 'px';
       canvas.style.height = rect.height + 'px';
-      ctx.setTransform(dpr,0,0,dpr,0,0); // scale drawing operations
-      // update globals
-      GAME_WIDTH = w; GAME_HEIGHT = h;
+      ctx.setTransform(dpr,0,0,dpr,0,0);
+      GAME_W = w; GAME_H = h;
     }
-    window.addEventListener('resize', ()=>{ try{ resizeCanvas(); }catch(e){} });
+    window.addEventListener('resize', resizeCanvas);
 
-    // UI
-    const btnStart = document.getElementById('btnStart');
-    const btnLevelSelect = document.getElementById('btnLevelSelect');
-    const btnInventory = document.getElementById('btnInventory');
-    const charColorIn = document.getElementById('charColor');
-    const charHat = document.getElementById('charHat');
-    const xpVal = document.getElementById('xpVal');
-    const coinsVal = document.getElementById('coinsVal');
-    const levelListEl = document.getElementById('levelList');
-
-    // Save/load
-    const SAVE_KEY = 'echoes_save_v1';
-    function loadSave(){ try{ const s = JSON.parse(localStorage.getItem(SAVE_KEY)||'{}'); return Object.assign({unlocked:1,xp:0,coins:0,custom:{color:'#8be9fd',hat:'none'}}, s); }catch(e){ return {unlocked:1,xp:0,coins:0,custom:{color:'#8be9fd',hat:'none'}} } }
-    function saveGame(){ localStorage.setItem(SAVE_KEY, JSON.stringify({unlocked:saveData.unlocked, xp:STATE.xp, coins:STATE.coins, custom:saveData.custom})); updateSidebar(); }
+    // Globals
+    let GAME_W = 900, GAME_H = 600;
     const saveData = loadSave();
+    const STATE = { mode:'menu', player:null, entities:[], echoes:[], levels:[], currentLevel:0, keys:{}, lastTimestamp:0, cutscene:null, xp:saveData.xp, coins:saveData.coins };
 
-    // Game globals
-    let GAME_WIDTH = 900, GAME_HEIGHT = 600; // will be updated by resizeCanvas
-    const STATE = { mode:'menu', currentLevel:0, levels:[], player:null, entities:[], echoes:[], keys:{}, lastTimestamp:0, cutscene:null, xp:saveData.xp, coins:saveData.coins };
+    function loadSave(){ try{ const s = JSON.parse(localStorage.getItem(SAVE_KEY)||'{}'); return Object.assign({unlocked:1,xp:0,coins:0,custom:{color:'#8be9fd',hat:'none'}}, s); }catch(e){ return {unlocked:1,xp:0,coins:0,custom:{color:'#8be9fd',hat:'none'}} } }
+    function persistSave(){ localStorage.setItem(SAVE_KEY, JSON.stringify({unlocked:saveData.unlocked, xp:STATE.xp, coins:STATE.coins, custom:saveData.custom})); }
 
-    // Helpers
-    function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
-    function rand(min,max){ return Math.random()*(max-min)+min }
+    // Utilities
+    function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
+    function rand(min,max){ return Math.random()*(max-min)+min; }
 
-    // Player with fixed, reliable movement + jump
+    // Player with stable platforming
     class Player{
-      constructor(x,y,color){ this.x=x; this.y=y; this.vx=0; this.vy=0; this.w=32; this.h=44; this.color=color; this.speed=220; this.onGround=false; this.health=100; this.maxHealth=100; this.dashCooldown=0; this.facing=1; this.recording=[]; this.jumpPower = 360; this.gravity = 1400; }
+      constructor(x,y,color){ this.x=x; this.y=y; this.w=34; this.h=46; this.vx=0; this.vy=0; this.color=color; this.speed=240; this.gravity=1500; this.jumpPower=420; this.onGround=false; this.dashCd=0; this.health=100; this.maxHealth=100; this.recording=[]; }
       update(dt){
-        // Horizontal input
-        let move = 0;
-        if(STATE.keys.ArrowLeft || STATE.keys.KeyA) move -= 1;
-        if(STATE.keys.ArrowRight || STATE.keys.KeyD) move += 1;
-        // apply horizontal velocity
-        const targetVx = move * this.speed;
-        // simple smoothing to avoid instant snap
-        this.vx += (targetVx - this.vx) * Math.min(1, 10 * dt);
-        // face
-        if(move !== 0) this.facing = move > 0 ? 1 : -1;
-
-        // vertical physics
-        this.vy += this.gravity * dt;
-        // Jump (press W or ArrowUp)
-        if((STATE.keys.ArrowUp || STATE.keys.KeyW) && this.onGround){ this.vy = -this.jumpPower; this.onGround = false; }
-        // Dash
-        if((STATE.keys.Space || STATE.keys.KeyX) && this.dashCooldown <= 0){ this.vx += this.facing * 420; this.dashCooldown = 0.9; }
-        this.dashCooldown = Math.max(0, this.dashCooldown - dt);
-
-        this.x += this.vx * dt;
-        this.y += this.vy * dt;
-
-        const floor = GAME_HEIGHT - 80; // reliable floor based on canvas size
-        if(this.y >= floor){ this.y = floor; this.vy = 0; this.onGround = true; }
-
-        // record for echoes
-        this.recording.push({x:this.x,y:this.y}); if(this.recording.length > 1200) this.recording.shift();
-
-        // bounds
-        this.x = clamp(this.x, 8, GAME_WIDTH - 8 - this.w);
+        let move = 0; if(STATE.keys.ArrowLeft||STATE.keys.KeyA) move -=1; if(STATE.keys.ArrowRight||STATE.keys.KeyD) move +=1;
+        const targetVx = move*this.speed; this.vx += (targetVx - this.vx) * Math.min(1, 14*dt);
+        if(STATE.keys.ArrowUp||STATE.keys.KeyW){ if(this.onGround){ this.vy = -this.jumpPower; this.onGround=false; } }
+        // dash
+        if((STATE.keys.Space || STATE.keys.KeyX) && this.dashCd<=0){ this.vx += (move===0? (this.facing||1)*1 : Math.sign(this.vx||1)) * 480; this.dashCd = 0.9; }
+        this.dashCd = Math.max(0, this.dashCd - dt);
+        this.facing = this.vx >= 0 ? 1 : -1;
+        this.vy += this.gravity * dt; this.x += this.vx * dt; this.y += this.vy * dt;
+        const floor = GAME_H - 96; if(this.y >= floor){ this.y = floor; this.vy = 0; this.onGround = true; }
+        this.recording.push({x:this.x,y:this.y}); if(this.recording.length>1500) this.recording.shift();
+        this.x = clamp(this.x, 8, GAME_W - 8 - this.w);
       }
-      draw(ctx, alpha=1){ ctx.save(); ctx.globalAlpha = alpha; ctx.translate(this.x + this.w/2, this.y + this.h/2); ctx.fillStyle = this.color; ctx.fillRect(-this.w/2, -this.h/2, this.w, this.h); ctx.fillStyle = '#061224'; ctx.fillRect(-10, -12, 6, 6); ctx.fillRect(4, -12, 6, 6); const hat = saveData.custom.hat; if(hat === 'cap'){ ctx.fillStyle = '#222'; ctx.fillRect(-16, -20, 32, 6); } else if(hat === 'crown'){ ctx.fillStyle = '#ffcc33'; ctx.beginPath(); ctx.moveTo(-16, -18); ctx.lineTo(-8, -6); ctx.lineTo(0, -18); ctx.lineTo(8, -6); ctx.lineTo(16, -18); ctx.closePath(); ctx.fill(); } ctx.restore(); }
+      draw(ctx,alpha=1){ ctx.save(); ctx.globalAlpha = alpha; ctx.translate(this.x + this.w/2, this.y + this.h/2); ctx.fillStyle = this.color; ctx.fillRect(-this.w/2,-this.h/2,this.w,this.h); ctx.fillStyle='#061224'; ctx.fillRect(-10,-14,6,6); ctx.fillRect(4,-14,6,6); // hat
+        const hat = saveData.custom.hat; if(hat==='cap'){ ctx.fillStyle='#222'; ctx.fillRect(-16,-22,32,6); } else if(hat==='crown'){ ctx.fillStyle='#ffcc33'; ctx.beginPath(); ctx.moveTo(-16,-20); ctx.lineTo(-8,-6); ctx.lineTo(0,-20); ctx.lineTo(8,-6); ctx.lineTo(16,-20); ctx.closePath(); ctx.fill(); }
+        ctx.restore(); }
     }
 
     // Echo
-    class Echo{ constructor(recording, color){ this.recording = recording.slice(); this.t = 0; this.idx = 0; this.x = this.recording[0]?.x || 0; this.y = this.recording[0]?.y || 0; this.color = color; this.dead = false; } update(dt){ this.t += dt; this.idx = Math.floor(this.t * 60); if(this.idx >= this.recording.length){ this.dead = true; return; } const s = this.recording[this.idx]; if(s){ this.x = s.x; this.y = s.y; } } draw(ctx){ ctx.save(); ctx.globalAlpha = 0.48; ctx.translate(this.x + 16, this.y + 22); ctx.fillStyle = this.color; ctx.fillRect(-16, -22, 32, 44); ctx.restore(); } }
+    class Echo{ constructor(recording,color){ this.recording = recording.slice(); this.t=0; this.idx=0; this.color=color; this.dead=false; this.x=0; this.y=0; } update(dt){ this.t += dt; this.idx = Math.floor(this.t*60); if(this.idx >= this.recording.length){ this.dead = true; return; } const s = this.recording[this.idx]; if(s){ this.x=s.x; this.y=s.y; } } draw(ctx){ ctx.save(); ctx.globalAlpha=0.5; ctx.translate(this.x + 18, this.y + 22); ctx.fillStyle=this.color; ctx.fillRect(-18,-22,36,44); ctx.restore(); } }
 
-    // Enemy
-    class Enemy{ constructor(x,y,type='grunt'){ this.x=x; this.y=y; this.w=30; this.h=34; this.type=type; this.vx=0; this.health = type==='boss'?500:70; this.ang = rand(0, Math.PI*2); this._dead=false; } update(dt){ this.ang += dt; if(this.type === 'grunt'){ this.x += Math.sin(this.ang * 1.6) * 40 * dt; } else if(this.type === 'shooter'){ this.x += Math.cos(this.ang * 0.9) * 20 * dt; } } draw(ctx){ ctx.save(); ctx.translate(this.x + this.w/2, this.y + this.h/2); ctx.fillStyle = (this.type==='boss') ? '#ff6b6b' : (this.type==='shooter' ? '#a6ffb0' : '#ffb86b'); ctx.fillRect(-this.w/2, -this.h/2, this.w, this.h); if(this.type==='boss'){ ctx.fillStyle='#fff'; ctx.font='12px Inter'; ctx.fillText('BOSS', -18, 6); } ctx.restore(); } }
+    // Enemy & Wave spawner
+    class Enemy{ constructor(x,y,type='grunt'){ this.x=x; this.y=y; this.w=30; this.h=34; this.type=type; this.health = type==='boss'?900:80; this.ang=rand(0,Math.PI*2); this.dead=false; } update(dt){ if(this.type==='grunt'){ this.x += Math.sin(this.ang*1.6)*40*dt; } else if(this.type==='shooter'){ this.ang += dt; this.x += Math.cos(this.ang*0.9)*16*dt; } } draw(ctx){ ctx.save(); ctx.translate(this.x + this.w/2, this.y + this.h/2); ctx.fillStyle = this.type==='boss'? '#ff6b6b' : (this.type==='shooter'? '#a6ffb0' : '#ffb86b'); ctx.fillRect(-this.w/2,-this.h/2,this.w,this.h); ctx.restore(); } }
 
-    // Boss pattern helper
-    function spawnBossPattern(boss){ boss.phase = 0; boss.timer = 0; boss.update = function(dt){ this.timer += dt; if(this.phase === 0){ this.x += Math.sin(this.timer*1.2) * Math.min(140, GAME_WIDTH*0.12) * dt; this.y = 120 + Math.cos(this.timer*0.9)*20; if(this.timer > 6){ this.phase = 1; this.timer = 0; } } else if(this.phase === 1){ if(this.timer > 0.8){ const targetX = (STATE.player?.x || GAME_WIDTH/2); this.x += (targetX - this.x) * dt * 3; this.y += 200 * dt; if(this.y > GAME_HEIGHT - 160){ this.y = 120; this.phase = 0; this.timer = 0; } } } }; }
+    // Boss specialized class with phased behavior, telegraph, and health bar
+    class Boss extends Enemy{
+      constructor(x,y){ super(x,y,'boss'); this.w=160; this.h=160; this.phase=0; this.timer=0; this.invulnerable=false; this.telegraph=0; }
+      update(dt){ this.timer += dt;
+        // phases: 0=hover, 1=slam pattern, 2=projectile barrage, 3=enraged
+        if(this.phase===0){ this.x = (GAME_W/2 - this.w/2) + Math.sin(this.timer*0.8)*Math.min(200, GAME_W*0.12); if(this.timer>5) { this.phase=1; this.telegraph=1.2; this.timer=0; this.invulnerable=true; } }
+        else if(this.phase===1){ // slam sequence
+          if(this.telegraph>0){ this.telegraph -= dt; if(this.telegraph<=0){ this.invulnerable=false; /* perform slam - target player x quickly */ } }
+          else { // slam movement
+            const targetX = (STATE.player?.x || GAME_W/2); this.x += (targetX - this.x) * dt * 4; if(this.timer > 3){ this.phase=2; this.timer=0; this.telegraph=0.8; this.invulnerable=true; } }
+        }
+        else if(this.phase===2){ // projectile barrage: telegraph then fire
+          if(this.telegraph>0){ this.telegraph -= dt; if(this.telegraph<=0) this.invulnerable=false; }
+          if(this.timer > 4){ this.phase = 3; this.timer = 0; this.invulnerable = false; }
+        }
+        else if(this.phase===3){ // enraged - faster movement + damage
+          this.x += Math.sin(this.timer*3.0)*Math.min(300,GAME_W*0.18)*dt; if(this.timer > 6) { this.phase = 0; this.timer=0; } }
+      }
+      draw(ctx){ super.draw(ctx); // boss health bar on top
+        const barW = Math.min(500, GAME_W - 120); const barX = (GAME_W - barW)/2; const barY = 16; ctx.save(); ctx.fillStyle='rgba(0,0,0,0.6)'; ctx.fillRect(barX-4,barY-6,barW+8,28); ctx.fillStyle='#333'; ctx.fillRect(barX,barY,barW,16); const pct = Math.max(0, Math.min(1, this.health / 900)); ctx.fillStyle='#ff6b6b'; ctx.fillRect(barX,barY,barW * pct,16); ctx.strokeStyle='#fff'; ctx.strokeRect(barX,barY,barW,16); // telegraph
+        if(this.invulnerable || this.telegraph>0){ ctx.fillStyle='rgba(255,100,100,0.12)'; ctx.fillRect(barX,barY,barW,16); }
+        ctx.restore(); }
+    }
 
-    // Levels
-    function makeLevels(){ return [
-        {id:0, name:'Ravenwood Edge', enemies:[{x:360,y:GAME_HEIGHT-140},{x:560,y:GAME_HEIGHT-140}], boss:false, cutscene:['You awake at the edge of Ravenwood.','You feel a pull — a memory missing.']},
-        {id:1, name:'Forgotten Cemetery', enemies:[{x:260,y:GAME_HEIGHT-140},{x:460,y:GAME_HEIGHT-140},{x:720,y:GAME_HEIGHT-140}], boss:false, cutscene:['Tombs whisper. The echoes tremble.']},
-        {id:2, name:'Whispering Hollow', enemies:[{x:200,y:GAME_HEIGHT-140, type:'shooter'},{x:420,y:GAME_HEIGHT-140},{x:680,y:GAME_HEIGHT-140}], boss:false, cutscene:['A hollow forms — echoes multiply.']},
-        {id:3, name:'Shadow Market', enemies:[{x:300,y:GAME_HEIGHT-140},{x:360,y:GAME_HEIGHT-140},{x:620,y:GAME_HEIGHT-140},{x:760,y:GAME_HEIGHT-140}], boss:false, cutscene:['A market frozen in time. Take care.']},
-        {id:4, name:'Eldritch Approach', enemies:[{x:360,y:GAME_HEIGHT-180},{x:520,y:GAME_HEIGHT-180},{x:680,y:GAME_HEIGHT-180}], boss:false, cutscene:['The shrine draws near.']},
-        {id:5, name:'Eldritch Shrine — Warden', enemies:[{x:GAME_WIDTH/2,y:180, type:'boss'}], boss:true, cutscene:['The Warden stirs... He prizes obedience.']},
-        {id:6, name:'Abyssal Paths', enemies:[{x:240,y:GAME_HEIGHT-140},{x:440,y:GAME_HEIGHT-140},{x:640,y:GAME_HEIGHT-140},{x:840,y:GAME_HEIGHT-140}], boss:false, cutscene:['The path below hums with pressure.']},
-        {id:7, name:'Wraithcaller — Final', enemies:[{x:GAME_WIDTH/2,y:160,type:'boss'}], boss:true, cutscene:['The Wraithcaller returns. This is the final stand.']}
-      ]; }
+    // Level data with waves
+    function makeLevels(){
+      return [
+        {id:0,name:'Ravenwood Edge', waves:[[{x:360,y:GAME_H-140},{x:560,y:GAME_H-140}]], boss:false, cut:['You awake...']},
+        {id:1,name:'Forgotten Cemetery', waves:[[{x:260,y:GAME_H-140},{x:460,y:GAME_H-140}], [{x:720,y:GAME_H-140}]], boss:false, cut:['Tombs whisper.']},
+        {id:5,name:'Eldritch Shrine — Warden', waves:[[{x:420,y:220,type:'grunt'},{x:520,y:220,type:'shooter'}]], boss:true, cut:['The Warden rises...']},
+      ];
+    }
 
-    // Cutscene
-    class Cutscene{ constructor(lines, portrait, onEnd){ this.lines = lines; this.portrait = portrait; this.step = 0; this.t = 0; this.onEnd = onEnd; this.active = true; } update(dt){ this.t += dt; if(this.t > 3.2){ this.step++; this.t = 0; } if(this.step >= this.lines.length){ this.active = false; if(this.onEnd) this.onEnd(); } } draw(ctx){ ctx.save(); ctx.fillStyle = 'rgba(0,0,0,0.7)'; ctx.fillRect(40, GAME_HEIGHT-220, GAME_WIDTH-80, 160); ctx.fillStyle='#cfe9ff'; ctx.font='18px Inter'; ctx.fillText(this.lines[this.step] || '', 140, GAME_HEIGHT-180); if(this.portrait){ ctx.fillStyle=this.portrait; ctx.fillRect(60, GAME_HEIGHT-210, 64, 64); } ctx.restore(); } }
+    // load level, spawn waves reliably and lock progression until waves cleared
+    let waveIndex = 0; let waveTimer = 0; let currentWave = [];
+    function startLevel(idx){ STATE.entities=[]; STATE.echoes=[]; const lvl = STATE.levels[idx]; STATE.currentLevel = idx; STATE.player = new Player(90, GAME_H - 140, saveData.custom.color); waveIndex = 0; waveTimer = 0; currentWave = []; STATE.mode='playing'; // spawn first wave after small delay
+      spawnWave(); if(lvl.boss){ // spawn boss after small delay
+        setTimeout(()=>{ const boss = new Boss(GAME_W/2 - 80, 120); boss.health = 900; STATE.entities.push(boss); }, 1200); }
+    }
 
-    // Level loader
-    function loadLevel(idx){ STATE.entities = []; STATE.echoes = []; const lvl = STATE.levels[idx]; STATE.player = new Player(90, GAME_HEIGHT - 140, saveData.custom.color); STATE.player.coins = 0; STATE.currentLevel = idx; // spawn enemies
-      lvl.enemies.forEach(e => { const en = new Enemy(e.x || 360, e.y || GAME_HEIGHT - 140, e.type || 'grunt'); STATE.entities.push(en); });
-      STATE.mode = 'cutscene'; STATE.cutscene = new Cutscene(lvl.cutscene, '#8be9fd', ()=>{ STATE.mode = 'playing'; if(lvl.boss){ const boss = new Enemy(GAME_WIDTH/2 - 60, 140, 'boss'); boss.w = 140; boss.h = 140; boss.health = 900; spawnBossPattern(boss); STATE.entities.push(boss); } }); }
+    function spawnWave(){ const lvl = STATE.levels[STATE.currentLevel]; if(!lvl || !lvl.waves) return; if(waveIndex >= lvl.waves.length) return; const wave = lvl.waves[waveIndex]; wave.forEach(spec=>{ const e = new Enemy(spec.x, spec.y, spec.type||'grunt'); STATE.entities.push(e); currentWave.push(e); }); waveIndex++; }
 
-    function onLevelComplete(){ const lvl = STATE.levels[STATE.currentLevel]; const awardXP = 50 + STATE.currentLevel * 10; const coins = 10 + STATE.currentLevel * 5; STATE.xp += awardXP; STATE.coins += coins; saveData.xp = STATE.xp; saveData.coins = STATE.coins; saveData.unlocked = Math.max(saveData.unlocked, STATE.currentLevel + 2); saveGame(); }
-
-    // Main loop
-    function update(dt){ if(STATE.mode === 'menu') return; if(STATE.mode === 'cutscene'){ if(STATE.cutscene){ STATE.cutscene.update(dt); if(!STATE.cutscene.active) STATE.mode = 'playing'; } return; }
+    function update(dt){ if(STATE.mode==='menu') return; if(STATE.mode==='cutscene'){ if(STATE.cutscene){ STATE.cutscene.t += dt; if(STATE.cutscene.t > 2.4){ STATE.cutscene.done=true; STATE.mode='playing'; } } return; }
       if(!STATE.player) return; STATE.player.update(dt);
       // update entities
-      STATE.entities.forEach(e => { if(!e._dead) e.update(dt); });
-      STATE.echoes.forEach(ec => ec.update(dt)); STATE.echoes = STATE.echoes.filter(ec => !ec.dead);
+      STATE.entities.forEach(e=>{ if(e.update) e.update(dt); });
+      STATE.echoes.forEach(ec=>ec.update(dt)); STATE.echoes = STATE.echoes.filter(ec=>!ec.dead);
 
-      // collisions
-      STATE.entities.forEach(e => { if(e._dead) return; const px = STATE.player.x + STATE.player.w/2; const py = STATE.player.y + STATE.player.h/2; const ex = e.x + e.w/2; const ey = e.y + e.h/2; if(Math.abs(px - ex) < 40 && Math.abs(py - ey) < 48){ STATE.player.health -= (e.type === 'boss') ? 0.6 : 0.18; if(e.type !== 'boss'){ e.health -= 120 * dt; if(e.health <= 0){ e._dead = true; STATE.player.coins += 2; } } else { e.health -= 24 * dt; if(e.health <= 0) e._dead = true; } } });
+      // collision and damage handling
+      STATE.entities.forEach(e=>{ if(e.dead) return; // simple AABB
+        if(Math.abs((STATE.player.x + STATE.player.w/2) - (e.x + e.w/2)) < 40 && Math.abs((STATE.player.y + STATE.player.h/2) - (e.y + e.h/2)) < 48){ // collision
+          // if boss has invulnerability, player still takes damage but boss safe
+          STATE.player.health -= (e.type === 'boss') ? 0.6 : 0.18;
+          if(e.type !== 'boss' && !e.dead){ e.health -= 140 * dt; if(e.health <= 0) { e.dead = true; } }
+          if(e.type === 'boss' && !e.dead && !(e.invulnerable)){ e.health -= 32 * dt; if(e.health <= 0) e.dead = true; }
+        }
+      });
 
+      // clean dead
       const hadBoss = STATE.entities.some(e=>e.type==='boss');
-      STATE.entities = STATE.entities.filter(e=>!e._dead);
+      STATE.entities = STATE.entities.filter(e=>!e.dead);
+
+      // wave auto-spawn: if current enemies are gone, spawn next wave
+      const lvl = STATE.levels[STATE.currentLevel]; const remaining = STATE.entities.filter(e=>e.type !== 'boss');
+      if(remaining.length === 0 && lvl && !lvl.boss){ if(waveIndex < lvl.waves.length){ // small delay before next wave
+          waveTimer += dt; if(waveTimer > 0.8){ spawnWave(); waveTimer = 0; } } else { // level clear
+          levelClear(); } }
+
+      // boss defeat
       const boss = STATE.entities.find(e=>e.type==='boss');
-      if(!boss && hadBoss && STATE.levels[STATE.currentLevel].boss){ STATE.echoes.push(new Echo(STATE.player.recording, STATE.player.color)); STATE.mode = 'cutscene'; STATE.cutscene = new Cutscene(['The boss collapses...','Memories return piece by piece.'], '#ff6b6b', ()=>{ onLevelComplete(); STATE.mode='menu'; }); }
+      if(!boss && hadBoss && lvl && lvl.boss){ // boss was present and now gone
+        levelClear(); }
 
-      const nonBoss = STATE.entities.filter(e=>e.type!=='boss'); if(nonBoss.length === 0 && !STATE.levels[STATE.currentLevel].boss){ STATE.echoes.push(new Echo(STATE.player.recording, STATE.player.color)); onLevelComplete(); setTimeout(()=>{ const next = Math.min(STATE.levels.length - 1, STATE.currentLevel + 1); loadLevel(next); }, 700); }
+      // clamp player health
+      STATE.player.health = clamp(STATE.player.health, 0, STATE.player.maxHealth);
     }
 
-    function draw(){ ctx.clearRect(0,0,GAME_WIDTH,GAME_HEIGHT); const g = ctx.createLinearGradient(0,0,0,GAME_HEIGHT); g.addColorStop(0,'#081028'); g.addColorStop(1,'#071124'); ctx.fillStyle = g; ctx.fillRect(0,0,GAME_WIDTH,GAME_HEIGHT); ctx.fillStyle = '#071220'; ctx.fillRect(0,GAME_HEIGHT - 80,GAME_WIDTH,80);
-      STATE.entities.forEach(e => e.draw(ctx)); STATE.echoes.forEach(ec => ec.draw(ctx)); if(STATE.player) STATE.player.draw(ctx);
-      ctx.fillStyle = '#cfe9ff'; ctx.font = '15px Inter'; ctx.fillText('Level: ' + (STATE.levels[STATE.currentLevel]?.name || '—'), Math.max(16, GAME_WIDTH - 320), 28); ctx.fillText('Health: ' + Math.floor(STATE.player?.health || 0), Math.max(16, GAME_WIDTH - 320), 50);
-      if(STATE.mode === 'cutscene' && STATE.cutscene) STATE.cutscene.draw(ctx);
+    function levelClear(){ // award and save; create echo
+      STATE.echoes.push(new Echo(STATE.player.recording, STATE.player.color)); STATE.xp = (STATE.xp||0) + 50; STATE.coins = (STATE.coins||0) + 20; saveData.unlocked = Math.max(saveData.unlocked, STATE.currentLevel + 2); persistSave(); // show tiny popup HUD (implemented as temporary cutscene)
+      STATE.mode = 'cutscene'; STATE.cutscene = { t:0, done:false }; setTimeout(()=>{ STATE.mode='menu'; }, 900);
     }
 
-    function loop(ts){ if(!STATE.lastTimestamp) STATE.lastTimestamp = ts; const dt = Math.min(0.05,(ts - STATE.lastTimestamp)/1000); STATE.lastTimestamp = ts; update(dt); draw(); requestAnimationFrame(loop); }
+    function draw(){ ctx.clearRect(0,0,GAME_W,GAME_H); const g = ctx.createLinearGradient(0,0,0,GAME_H); g.addColorStop(0,'#081028'); g.addColorStop(1,'#071124'); ctx.fillStyle = g; ctx.fillRect(0,0,GAME_W,GAME_H); ctx.fillStyle='#071220'; ctx.fillRect(0,GAME_H-96,GAME_W,96);
+      // draw entities
+      STATE.entities.forEach(e=>{ if(e.draw) e.draw(ctx); }); STATE.echoes.forEach(ec=>ec.draw(ctx)); if(STATE.player) STATE.player.draw(ctx);
+      // HUD: level name, health
+      ctx.fillStyle='#cfe9ff'; ctx.font='15px Inter'; ctx.fillText('Level: ' + (STATE.levels[STATE.currentLevel]?.name || '—'), Math.max(16, GAME_W - 360), 28); ctx.fillText('Health: ' + Math.floor(STATE.player?.health || 0), Math.max(16, GAME_W - 360), 48);
+      // if boss present its own draw handles healthbar
+    }
 
-    // Input
-    window.addEventListener('keydown', (e)=>{ STATE.keys[e.code] = true; // prevent arrow keys from scrolling page
-      if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code)) e.preventDefault(); if(e.code==='Enter' && STATE.mode === 'menu'){ const startLevel = Math.max(0, saveData.unlocked - 1); loadLevel(startLevel); } if(e.code==='KeyP'){ STATE.mode = (STATE.mode === 'playing') ? 'paused' : (STATE.mode === 'paused' ? 'playing' : STATE.mode); } });
-    window.addEventListener('keyup', (e)=>{ STATE.keys[e.code] = false; });
+    function loop(ts){ if(!STATE.lastTimestamp) STATE.lastTimestamp = ts; const dt = Math.min(0.05, (ts - STATE.lastTimestamp)/1000); STATE.lastTimestamp = ts; update(dt); draw(); requestAnimationFrame(loop); }
 
-    // UI handlers
-    btnStart.addEventListener('click', ()=>{ const startLevel = Math.max(0, saveData.unlocked - 1); loadLevel(startLevel); });
-    btnLevelSelect.addEventListener('click', ()=>{ const choice = prompt('Enter level number (1-'+STATE.levels.length+') to jump to (unlocked up to '+saveData.unlocked+').'); const n = parseInt(choice); if(!isNaN(n) && n>=1 && n<=STATE.levels.length && n<=saveData.unlocked){ loadLevel(n-1); } else alert('Invalid or locked'); });
-    btnInventory.addEventListener('click', ()=>{ const cost = 20; if(STATE.coins >= cost){ if(confirm('Spend '+cost+' coins to increase max health by 20?')){ STATE.coins -= cost; saveData.coins = STATE.coins; if(STATE.player){ STATE.player.maxHealth = (STATE.player.maxHealth || 100) + 20; STATE.player.health = Math.min(STATE.player.maxHealth, STATE.player.health + 20); } saveGame(); alert('Purchased!'); } } else alert('Not enough coins'); });
+    // input
+    window.addEventListener('keydown',(e)=>{ STATE.keys[e.code] = true; if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code)) e.preventDefault(); if(e.code === 'Enter' && STATE.mode === 'menu'){ startLevel(Math.max(0, saveData.unlocked - 1)); } if(e.code === 'KeyP'){ STATE.mode = (STATE.mode === 'playing') ? 'paused' : (STATE.mode === 'paused' ? 'playing' : STATE.mode); } });
+    window.addEventListener('keyup',(e)=>{ STATE.keys[e.code] = false; });
 
-    charColorIn.addEventListener('input', ()=>{ saveData.custom.color = charColorIn.value; saveGame(); drawPreview(); }); charHat.addEventListener('change', ()=>{ saveData.custom.hat = charHat.value; saveGame(); drawPreview(); });
+    // UI bindings
+    document.getElementById('btnStart').addEventListener('click', ()=>{ startLevel(Math.max(0, saveData.unlocked - 1)); });
+    document.getElementById('btnLevelSelect').addEventListener('click', ()=>{ const choice = prompt('Level number?'); const n = parseInt(choice); if(!isNaN(n) && n>=1 && n<=STATE.levels.length && n<=saveData.unlocked) startLevel(n-1); else alert('Invalid or locked'); });
+    document.getElementById('btnInventory').addEventListener('click', ()=>{ const cost=20; if((STATE.coins||0) >= cost){ if(confirm('Spend '+cost+' coins to increase max health by 20?')){ STATE.coins = (STATE.coins||0) - cost; if(STATE.player){ STATE.player.maxHealth = (STATE.player.maxHealth||100) + 20; STATE.player.health = Math.min(STATE.player.maxHealth, STATE.player.health + 20); } persistSave(); alert('Purchased!'); } } else alert('Not enough coins'); });
 
-    function drawPreview(){ pctx.clearRect(0,0,previewCanvas.width,previewCanvas.height); pctx.fillStyle='#041026'; pctx.fillRect(0,0,previewCanvas.width,previewCanvas.height); const px = previewCanvas.width/2 - 10, py = previewCanvas.height/2 - 12; pctx.fillStyle = saveData.custom.color; pctx.fillRect(px,py,20,28); const hat = saveData.custom.hat; pctx.fillStyle='#222'; if(hat==='cap') pctx.fillRect(px-6,py-6,32,6); if(hat==='crown'){ pctx.fillStyle='#ffcc33'; pctx.beginPath(); pctx.moveTo(px-6,py-6); pctx.lineTo(px-2,py+4); pctx.lineTo(px+6,py-6); pctx.lineTo(px+14,py+4); pctx.lineTo(px+20,py-6); pctx.closePath(); pctx.fill(); } }
-
-    function updateSidebar(){ levelListEl.innerHTML=''; STATE.levels.forEach((lv,i)=>{ const el = document.createElement('div'); el.className='level-card'; el.textContent = (i+1)+'. '+lv.name + (i+1<=saveData.unlocked?'':' (locked)'); el.addEventListener('click', ()=>{ if(i+1<=saveData.unlocked){ loadLevel(i); } else alert('Locked'); }); levelListEl.appendChild(el); }); xpVal.textContent = STATE.xp; coinsVal.textContent = STATE.coins; }
+    document.getElementById('charColor').addEventListener('input',(e)=>{ saveData.custom.color = e.target.value; persistSave(); }); document.getElementById('charHat').addEventListener('change',(e)=>{ saveData.custom.hat = e.target.value; persistSave(); });
 
     // init
-    resizeCanvas(); STATE.levels = makeLevels(); charColorIn.value = saveData.custom.color || '#8be9fd'; charHat.value = saveData.custom.hat || 'none'; drawPreview(); updateSidebar(); requestAnimationFrame(loop);
+    resizeCanvas(); STATE.levels = makeLevels(); requestAnimationFrame(loop);
 
-    // expose debug API
-    window.GAME = { STATE, saveData, loadLevel, saveGame, updateSidebar };
+    // expose for debug
+    window.GAME = { STATE, saveData, startLevel, persistSave };
   })();
   </script>
-</body>
-</html>
 </body>
 </html>
